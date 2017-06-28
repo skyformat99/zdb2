@@ -428,7 +428,7 @@ namespace zdb2
 				if (SQLITE_OK != _execute_sql(params.c_str()))
 				{
 					close();
-					throw std::runtime_error("error : unable to set database pragmas.");
+					throw std::runtime_error("unable to set database pragmas.");
 					return false;
 				}
 			}
@@ -465,7 +465,7 @@ namespace zdb2
 			std::string pass = m_url_ptr->get_param_value("password");
 			if (user.empty() || pass.empty())
 			{
-				throw std::runtime_error("error : url string is invalid,can't find the user and password parameters.");
+				throw std::runtime_error("url string is invalid,can't find the user and password parameters.");
 				return false;
 			}
 

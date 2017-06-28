@@ -41,7 +41,7 @@ namespace zdb2
 		{
 			assert(m_stmt);
 			if (!m_stmt)
-				throw std::runtime_error("error : invalid parameters.");
+				throw std::runtime_error("invalid parameters.");
 
 			_init();
 		}
@@ -139,7 +139,7 @@ namespace zdb2
 #endif
 			if (status != SQLITE_ROW && status != SQLITE_DONE)
 			{
-				throw std::runtime_error("error : not desired return value of sqlite3_step.");
+				throw std::runtime_error("not desired return value of sqlite3_step.");
 			}
 			return (status == SQLITE_ROW);
 		}

@@ -138,7 +138,7 @@ namespace zdb2
 //#endif
 //			if (status != SQLITE_ROW && status != SQLITE_DONE)
 //			{
-//				throw std::runtime_error("error : not desired return value of sqlite3_step.");
+//				throw std::runtime_error("not desired return value of sqlite3_step.");
 //			}
 //			return (status == SQLITE_ROW);
 //		}

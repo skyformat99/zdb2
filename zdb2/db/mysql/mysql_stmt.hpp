@@ -37,7 +37,7 @@ namespace zdb2
 			, m_db(db)
 		{
 			if (!m_db)
-				throw std::runtime_error("error : invalid parameters.");
+				throw std::runtime_error("invalid parameters.");
 
 			_init();
 		}

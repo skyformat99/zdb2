@@ -41,7 +41,7 @@ namespace zdb2
 		{
 			assert(m_stmt);
 			if (!m_stmt)
-				throw std::runtime_error("error : invalid parameters.");
+				throw std::runtime_error("invalid parameters.");
 
 			_init();
 		}

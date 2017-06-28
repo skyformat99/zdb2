@@ -396,34 +396,34 @@ namespace zdb2
 			}
 			else if (host.empty())
 			{
-				throw std::runtime_error("error : no host specified in url.");
+				throw std::runtime_error("no host specified in url.");
 				return false;
 			}
 			if (port.empty())
 			{
-				throw std::runtime_error("error : no port specified in url.");
+				throw std::runtime_error("no port specified in url.");
 				return false;
 			}
 			if (database.empty())
 			{
-				throw std::runtime_error("error : no database specified in url.");
+				throw std::runtime_error("no database specified in url.");
 				return false;
 			}
 			if (user.empty())
 			{
-				throw std::runtime_error("error : no username specified in url.");
+				throw std::runtime_error("no username specified in url.");
 				return false;
 			}
 			if (pass.empty())
 			{
-				throw std::runtime_error("error : no password specified in url.");
+				throw std::runtime_error("no password specified in url.");
 				return false;
 			}
 
 			m_db = mysql_init(nullptr);
 			if (!m_db)
 			{
-				throw std::runtime_error("error : unable to allocate mysql handler.");
+				throw std::runtime_error("unable to allocate mysql handler.");
 				return false;
 			}
 			

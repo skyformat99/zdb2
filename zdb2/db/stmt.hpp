@@ -28,7 +28,7 @@ namespace zdb2
 		stmt(const char * sql, std::size_t timeout) : m_timeout(timeout)
 		{
 			if (!sql || sql[0] == '\0')
-				throw std::runtime_error("error : invalid parameters.");
+				throw std::runtime_error("invalid parameters.");
 			else
 				m_sql = sql;
 		}

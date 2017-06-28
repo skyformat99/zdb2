@@ -159,7 +159,7 @@ namespace zdb2
 
 			if (m_connections.size() == 0)
 			{
-				throw std::runtime_error("error : failed to fill the pool with initial connections.");
+				throw std::runtime_error("failed to fill the pool with initial connections.");
 				return false;
 			}
 
@@ -223,7 +223,7 @@ namespace zdb2
 			else if (_db_type == "sqlserver")
 				return dynamic_cast<connection *>(new sqlserver_connection(m_url_ptr, m_execute_timeout));
 			else
-				throw std::runtime_error("error : unknown database type.");
+				throw std::runtime_error("unknown database type.");
 			return nullptr;
 		}
 

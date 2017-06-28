@@ -36,7 +36,7 @@ namespace zdb2
 			, m_db(db)
 		{
 			if (!m_db)
-				throw std::runtime_error("error : invalid parameters.");
+				throw std::runtime_error("invalid parameters.");
 			
 			_init();
 		}
@@ -76,7 +76,7 @@ namespace zdb2
 				sqlite3_reset(m_stmt);
 				int size = x ? (int)std::strlen(x) : 0;
 				if (SQLITE_RANGE == sqlite3_bind_text(m_stmt, param_index, x, size, SQLITE_STATIC))
-					throw std::runtime_error("error : parameter index is out of range.");
+					throw std::runtime_error("parameter index is out of range.");
 			}
 		}
 
@@ -103,7 +103,7 @@ namespace zdb2
 			{
 				sqlite3_reset(m_stmt);
 				if (SQLITE_RANGE == sqlite3_bind_int(m_stmt, param_index, x))
-					throw std::runtime_error("error : parameter index is out of range.");
+					throw std::runtime_error("parameter index is out of range.");
 			}
 		}
 
@@ -130,7 +130,7 @@ namespace zdb2
 			{
 				sqlite3_reset(m_stmt);
 				if (SQLITE_RANGE == sqlite3_bind_int64(m_stmt, param_index, x))
-					throw std::runtime_error("error : parameter index is out of range.");
+					throw std::runtime_error("parameter index is out of range.");
 			}
 		}
 
@@ -151,7 +151,7 @@ namespace zdb2
 			{
 				sqlite3_reset(m_stmt);
 				if (SQLITE_RANGE == sqlite3_bind_double(m_stmt, param_index, x))
-					throw std::runtime_error("error : parameter index is out of range.");
+					throw std::runtime_error("parameter index is out of range.");
 			}
 		}
 
@@ -173,7 +173,7 @@ namespace zdb2
 			{
 				sqlite3_reset(m_stmt);
 				if (SQLITE_RANGE == sqlite3_bind_blob(m_stmt, param_index, x, (int)size, SQLITE_STATIC))
-					throw std::runtime_error("error : parameter index is out of range.");
+					throw std::runtime_error("parameter index is out of range.");
 			}
 		}
 
@@ -200,7 +200,7 @@ namespace zdb2
 			{
 				sqlite3_reset(m_stmt);
 				if (SQLITE_RANGE == sqlite3_bind_int64(m_stmt, param_index, x))
-					throw std::runtime_error("error : parameter index is out of range.");
+					throw std::runtime_error("parameter index is out of range.");
 			}
 		}
 
@@ -229,7 +229,7 @@ namespace zdb2
 				break;
 			case SQLITE_ROW:
 				status = sqlite3_reset(m_stmt);
-				throw std::runtime_error("error : select statement not allowed in execute().");
+				throw std::runtime_error("select statement not allowed in execute().");
 				break;
 			default:
 				status = sqlite3_reset(m_stmt);

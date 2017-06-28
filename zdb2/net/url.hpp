@@ -79,7 +79,7 @@ namespace zdb2
 		{
 			if (!url_string || *url_string == '\0')
 			{
-				throw std::runtime_error("error : url string is null.");
+				throw std::runtime_error("url string is null.");
 				return false;
 			}
 
@@ -93,7 +93,7 @@ namespace zdb2
 			std::size_t pos_dbtype_end = m_url.find_first_of("://", 0);
 			if (pos_dbtype_end == 0 || pos_dbtype_end == std::string::npos)
 			{
-				throw std::runtime_error("error : url string is invalid.");
+				throw std::runtime_error("url string is invalid.");
 				return false;
 			}
 			m_dbtype = m_url.substr(0, pos_dbtype_end - 0);
@@ -104,7 +104,7 @@ namespace zdb2
 
 			if (m_url.length() <= pos_host_begin)
 			{
-				throw std::runtime_error("error : url string is invalid.");
+				throw std::runtime_error("url string is invalid.");
 				return false;
 			}
 
@@ -119,7 +119,7 @@ namespace zdb2
 			else if (m_dbtype == "sqlserver")
 				return _parse_sqlserver(pos_host_begin);
 			else
-				throw std::runtime_error("error : unknown database type.");
+				throw std::runtime_error("unknown database type.");
 
 			return false;
 		}
@@ -155,7 +155,7 @@ namespace zdb2
 			std::size_t pos_db_end = m_url.find_first_of('?', pos_host_begin);
 			if (pos_db_end == pos_host_begin || pos_db_end == std::string::npos)
 			{
-				throw std::runtime_error("error : url string is invalid.");
+				throw std::runtime_error("url string is invalid.");
 				return false;
 			}
 			m_dbname = m_url.substr(pos_host_begin, pos_db_end - pos_host_begin);
@@ -177,7 +177,7 @@ namespace zdb2
 			std::size_t pos_host_end = m_url.find_first_of(':', pos_host_begin);
 			if (pos_host_end == pos_host_begin || pos_host_end == std::string::npos)
 			{
-				throw std::runtime_error("error : url string is invalid.");
+				throw std::runtime_error("url string is invalid.");
 				return false;
 			}
 
@@ -189,7 +189,7 @@ namespace zdb2
 			std::size_t pos_port_end = m_url.find_first_of('/', pos_host_end);
 			if (pos_port_end == pos_host_end || pos_port_end == std::string::npos)
 			{
-				throw std::runtime_error("error : url string is invalid.");
+				throw std::runtime_error("url string is invalid.");
 				return false;
 			}
 			m_port = m_url.substr(pos_host_end, pos_port_end - pos_host_end);
@@ -200,7 +200,7 @@ namespace zdb2
 			std::size_t pos_db_end = m_url.find_first_of('?', pos_port_end);
 			if (pos_db_end == pos_port_end || pos_db_end == std::string::npos)
 			{
-				throw std::runtime_error("error : url string is invalid.");
+				throw std::runtime_error("url string is invalid.");
 				return false;
 			}
 			m_dbname = m_url.substr(pos_port_end, pos_db_end - pos_port_end);
@@ -251,7 +251,7 @@ namespace zdb2
 			std::size_t pos_service_end = m_url.find_first_of('?', pos_service_begin);
 			if (pos_service_end == pos_service_begin || pos_service_end == std::string::npos)
 			{
-				throw std::runtime_error("error : url string is invalid.");
+				throw std::runtime_error("url string is invalid.");
 				return false;
 			}
 

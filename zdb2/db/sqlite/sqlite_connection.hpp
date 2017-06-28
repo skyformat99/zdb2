@@ -393,7 +393,7 @@ namespace zdb2
 				if (SQLITE_OK != _execute_sql(params.c_str()))
 				{
 					close();
-					throw std::runtime_error("error : unable to set database pragmas.");
+					throw std::runtime_error("unable to set database pragmas.");
 					return false;
 				}
 			}
@@ -407,7 +407,7 @@ namespace zdb2
 			std::string path = m_url_ptr->get_dbname();
 			if (path.empty())
 			{
-				throw std::runtime_error("error : no database specified in url");
+				throw std::runtime_error("no database specified in url");
 				return false;
 			}
 			/* Shared cache mode help reduce database lock problems if libzdb is used with many threads */
@@ -429,7 +429,7 @@ namespace zdb2
 #endif
 			if (SQLITE_OK != status)
 			{
-				throw std::runtime_error("error : cannot open database,check if the database file exists.");
+				throw std::runtime_error("cannot open database,check if the database file exists.");
 				sqlite3_close(m_db);
 				return false;
 			}
