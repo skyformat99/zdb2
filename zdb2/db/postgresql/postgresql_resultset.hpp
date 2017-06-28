@@ -19,7 +19,7 @@
 #include <unordered_map>
 #include <ctime>
 
-#include <oci.h>
+#include <libpq-fe.h>
 
 #include <zdb2/db/resultset.hpp>
 #include <zdb2/db/postgresql/postgresql_util.hpp>

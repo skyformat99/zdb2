@@ -19,7 +19,7 @@
 #include <chrono>
 #include <functional>
 
-#include <oci.h>
+#include <libpq-fe.h>
 
 #include <zdb2/config.hpp>
 #include <zdb2/net/url.hpp>

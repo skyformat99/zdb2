@@ -18,7 +18,7 @@
 #include <thread>
 #include <condition_variable>
 
-#include <oci.h>
+#include <libpq-fe.h>
 
 namespace zdb2
 {

@@ -16,7 +16,7 @@
 #include <algorithm>
 #include <mutex>
 
-#include <oci.h>
+#include <libpq-fe.h>
 
 #include <zdb2/db/stmt.hpp>
 #include <zdb2/db/postgresql/postgresql_util.hpp>
