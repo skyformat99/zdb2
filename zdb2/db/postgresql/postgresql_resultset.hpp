@@ -19,21 +19,21 @@
 #include <unordered_map>
 #include <ctime>
 
-#include <sqlite3.h>
+#include <oci.h>
 
 #include <zdb2/db/resultset.hpp>
-#include <zdb2/db/sqlite/sqlite_util.hpp>
+#include <zdb2/db/postgresql/postgresql_util.hpp>
 
 namespace zdb2
 {
 
 #pragma warning(disable:4996)
 
-	class sqlite_resultset : public resultset
+	class postgresql_resultset : public resultset
 	{
 	public:
-		sqlite_resultset(
-			sqlite3_stmt * stmt,
+		postgresql_resultset(
+			MYSQL_STMT * stmt,
 			std::size_t timeout = zdb2::DEFAULT_TIMEOUT
 		)
 			: resultset(timeout)
@@ -46,7 +46,7 @@ namespace zdb2
 			_init();
 		}
 
-		virtual ~sqlite_resultset()
+		virtual ~postgresql_resultset()
 		{
 			close();
 		}
@@ -55,8 +55,28 @@ namespace zdb2
 		{
 			if (m_stmt)
 			{
-				sqlite3_finalize(m_stmt);
+				mysql_stmt_free_result(m_stmt);
+				mysql_stmt_close(m_stmt);
 				m_stmt = nullptr;
+			}
+			if (m_meta)
+			{
+				mysql_free_result(m_meta);
+				m_meta = nullptr;
+			}
+			if (m_bind)
+			{
+				delete[]m_bind;
+				m_bind = nullptr;
+			}
+			if (m_columns)
+			{
+				for (int i = 0; i < m_column_count; i++)
+				{
+					std::free((void *)m_columns[i].buffer);
+				}
+				delete[]m_columns;
+				m_columns = nullptr;
 			}
 		}
 		
@@ -67,7 +87,7 @@ namespace zdb2
 		 */
 		virtual int get_column_count() override
 		{
-			return (m_stmt ? sqlite3_column_count(m_stmt) : 0);
+			return (m_stmt ? (int)mysql_stmt_field_count(m_stmt) : 0);
 		}
 
 
@@ -81,7 +101,9 @@ namespace zdb2
 		 */
 		virtual const char * get_column_name(int column_index) override
 		{
-			return (m_stmt ? sqlite3_column_name(m_stmt, column_index) : nullptr);
+			if (m_column_count <= 0 || column_index < 0 || column_index >= m_column_count)
+				return nullptr;
+			return m_columns[column_index].field->name;
 		}
 
 		/**
@@ -109,7 +131,11 @@ namespace zdb2
 		 */
 		virtual std::size_t get_column_size(int column_index) override
 		{
-			return (m_stmt ? sqlite3_column_bytes(m_stmt, column_index) : 0);
+			if (m_column_count <= 0 || column_index < 0 || column_index >= m_column_count)
+				return 0;
+			if (m_columns[column_index].is_null)
+				return 0;
+			return m_columns[column_index].length;
 		}
 
 		//@}
@@ -128,20 +154,21 @@ namespace zdb2
 		 */
 		virtual bool next_row() override
 		{
-			if (!m_stmt)
+			if (!m_stmt || !m_meta || m_column_count <= 0)
 				return false;
 
-			int status;
-#if defined SQLITEUNLOCK && SQLITE_VERSION_NUMBER >= 3006012
-			status = sqlite_util::sqlite3_blocking_step(m_stmt);
-#else
-			status = sqlite_util::execute(m_timeout, sqlite3_step, m_stmt);
-#endif
-			if (status != SQLITE_ROW && status != SQLITE_DONE)
+			if (m_need_rebind)
 			{
-				throw std::runtime_error("error : not desired return value of sqlite3_step.");
+				if ((mysql_util::MYSQL_OK != mysql_stmt_bind_result(m_stmt, m_bind)))
+					throw std::runtime_error(mysql_stmt_error(m_stmt));
+				m_need_rebind = false;
 			}
-			return (status == SQLITE_ROW);
+
+			int status = mysql_stmt_fetch(m_stmt);
+			if (1 == status)
+				throw std::runtime_error(mysql_stmt_error(m_stmt));
+
+			return ((status == mysql_util::MYSQL_OK) || (status == MYSQL_DATA_TRUNCATED));
 		}
 
 		/** @name Columns */
@@ -162,7 +189,10 @@ namespace zdb2
 		 */
 		virtual bool is_null(int column_index) override
 		{
-			return (m_stmt ? (sqlite3_column_type(m_stmt, column_index) == SQLITE_NULL) : true);
+			if (m_column_count <= 0 || column_index < 0 || column_index >= m_column_count)
+				return true;
+
+			return (m_columns[column_index].is_null);
 		}
 
 
@@ -184,7 +214,17 @@ namespace zdb2
 		 */
 		virtual const char * get_string(int column_index) override
 		{
-			return (m_stmt ? (const char*)sqlite3_column_text(m_stmt, column_index) : nullptr);
+			if (m_stmt && m_bind && m_columns && column_index >= 0 && column_index < m_column_count)
+			{
+				if (m_columns[column_index].is_null)
+					return nullptr;
+
+				_ensure_capacity(column_index);
+
+				m_columns[column_index].buffer[m_columns[column_index].length] = 0;
+				return m_columns[column_index].buffer;
+			}
+			return nullptr;
 		}
 
 
@@ -229,7 +269,8 @@ namespace zdb2
 		 */
 		virtual int get_int(int column_index) override
 		{
-			return (m_stmt ? sqlite3_column_int(m_stmt, column_index) : -1);
+			auto s = get_string(column_index);
+			return (s ? std::atoi(s) : -1);
 		}
 
 
@@ -253,8 +294,8 @@ namespace zdb2
 		 */
 		virtual int get_int(const char * column_name) override
 		{
-			int col_index = get_column_index(column_name);
-			return ((col_index >= 0) ? get_int(col_index) : -1);
+			auto s = get_string(column_name);
+			return (s ? std::atoi(s) : -1);
 		}
 
 
@@ -279,7 +320,8 @@ namespace zdb2
 		 */
 		virtual int64_t get_int64(int column_index) override
 		{
-			return (m_stmt ? sqlite3_column_int64(m_stmt, column_index) : -1);
+			auto s = get_string(column_index);
+			return (s ? (int64_t)std::atoll(s) : -1);
 		}
 
 
@@ -303,8 +345,8 @@ namespace zdb2
 		 */
 		virtual int64_t get_int64(const char * column_name) override
 		{
-			int col_index = get_column_index(column_name);
-			return ((col_index >= 0) ? get_int64(col_index) : -1);
+			auto s = get_string(column_name);
+			return (s ? (int64_t)std::atoll(s) : -1);
 		}
 
 
@@ -323,7 +365,8 @@ namespace zdb2
 		 */
 		virtual double get_double(int column_index) override
 		{
-			return (m_stmt ? sqlite3_column_double(m_stmt, column_index) : -1.f);
+			auto s = get_string(column_index);
+			return (s ? std::atof(s) : -1.f);
 		}
 
 
@@ -341,8 +384,8 @@ namespace zdb2
 		 */
 		virtual double get_double(const char * column_name) override
 		{
-			int col_index = get_column_index(column_name);
-			return ((col_index >= 0) ? get_double(col_index) : -1.f);
+			auto s = get_string(column_name);
+			return (s ? std::atof(s) : -1.f);
 		}
 
 
@@ -364,11 +407,18 @@ namespace zdb2
 		 */
 		virtual const void * get_blob(int column_index, std::size_t * size) override
 		{
-			if (!m_stmt)
-				return nullptr;
-			const void * blob = sqlite3_column_blob(m_stmt, column_index);
-			*size = sqlite3_column_bytes(m_stmt, column_index);
-			return blob;
+			if (m_stmt && m_bind && m_columns && column_index >= 0 && column_index < m_column_count)
+			{
+				if (m_columns[column_index].is_null)
+					return nullptr;
+
+				_ensure_capacity(column_index);
+
+				*size = m_columns[column_index].length;
+
+				return (const void *)m_columns[column_index].buffer;
+			}
+			return nullptr;
 		}
 
 
@@ -426,10 +476,6 @@ namespace zdb2
 		 */
 		virtual time_t get_timestamp(int column_index) override
 		{
-			if (!m_stmt)
-				return (time_t)0;
-			if (sqlite3_column_type(m_stmt, column_index) == SQLITE_INTEGER)
-				return (time_t)sqlite3_column_int64(m_stmt, column_index);
 			// Not integer storage class, try to parse as time string
 			return (time_t)0;
 		}
@@ -501,19 +547,19 @@ namespace zdb2
 			struct tm tm = { 0 };
 			if (!m_stmt)
 				return tm;
-			if (sqlite3_column_type(m_stmt, column_index) == SQLITE_INTEGER)
-			{
-				time_t utc = (time_t)sqlite3_column_int64(m_stmt, column_index);
-				struct tm * utc_tm = std::gmtime(&utc);
-				if (utc_tm)
-					utc_tm->tm_year += 1900; // Use year literal
-				return (*utc_tm);
-			}
-			else
-			{
-				// Not integer storage class, try to parse as time string
+			//if (sqlite3_column_type(m_stmt, column_index) == SQLITE_INTEGER)
+			//{
+			//	time_t utc = (time_t)sqlite3_column_int64(m_stmt, column_index);
+			//	struct tm * utc_tm = std::gmtime(&utc);
+			//	if (utc_tm)
+			//		utc_tm->tm_year += 1900; // Use year literal
+			//	return (*utc_tm);
+			//}
+			//else
+			//{
+			//	// Not integer storage class, try to parse as time string
 
-			}
+			//}
 			return tm;
 		}
 
@@ -552,27 +598,45 @@ namespace zdb2
 			return ((col_index >= 0) ? get_datetime(col_index) : tm);
 		}
 
-
 	protected:
-		virtual void _init() override
+
+		void _ensure_capacity(int i)
 		{
-			if (m_stmt)
+			if ((m_columns[i].length > m_bind[i].buffer_length))
 			{
-				int cols = get_column_count();
-				for (int col = 0; col < cols; col++)
-				{
-					std::string col_name(get_column_name(col));
-					m_column_name_map.emplace(col_name, col);
-				}
+				/* Column was truncated, resize and fetch column directly. */
+				std::realloc(m_columns[i].buffer, m_columns[i].length + 1);
+
+				m_bind[i].buffer = m_columns[i].buffer;
+				m_bind[i].buffer_length = m_columns[i].length;
+
+				if ((mysql_util::MYSQL_OK != mysql_stmt_fetch_column(m_stmt, &m_bind[i], i, 0)))
+					throw std::runtime_error(mysql_stmt_error(m_stmt));
+
+				m_need_rebind = true;
 			}
 		}
 
+		virtual void _init() override
+		{
+
+		}
 
 	protected:
 
-		sqlite3_stmt * m_stmt = nullptr;
+		MYSQL_STMT * m_stmt = nullptr;
+
+		MYSQL_RES * m_meta = nullptr;
 
 		std::unordered_map<std::string, int> m_column_name_map;
+
+		MYSQL_BIND * m_bind = nullptr;
+
+		mysql_util::column_t * m_columns = nullptr;
+
+		int m_column_count = 0;
+
+		bool m_need_rebind = false;
 
 	};
 

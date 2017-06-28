@@ -25,8 +25,12 @@ namespace zdb2
 	class stmt
 	{
 	public:
-		stmt(std::size_t timeout) : m_timeout(timeout)
+		stmt(const char * sql, std::size_t timeout) : m_timeout(timeout)
 		{
+			if (!sql || sql[0] == '\0')
+				throw std::runtime_error("error : invalid parameters.");
+			else
+				m_sql = sql;
 		}
 
 		virtual ~stmt()
@@ -174,13 +178,17 @@ namespace zdb2
 		}
 
 		//@}
-		
+
+	protected:
+		virtual void _init() = 0;
 
 	protected:
 
 		std::size_t m_timeout = zdb2::DEFAULT_TIMEOUT;
 
 		int m_param_count = 0;
+
+		std::string m_sql;
 
 	};
 

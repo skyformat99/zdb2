@@ -34,6 +34,12 @@
     <Filter Include="zdb2\db\mysql">
       <UniqueIdentifier>{43f24907-5980-453b-a3a8-be01ae93cca8}</UniqueIdentifier>
     </Filter>
+    <Filter Include="zdb2\db\oracle">
+      <UniqueIdentifier>{b4156953-d8bc-434d-8b80-d7ca5b04a49b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="zdb2\db\postgresql">
+      <UniqueIdentifier>{3610a45a-0795-4047-a80a-8d5997d914a1}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\main.cpp">
@@ -103,6 +109,30 @@
     </ClInclude>
     <ClInclude Include="..\..\zdb2\db\mysql\mysql_util.hpp">
       <Filter>zdb2\db\mysql</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\oracle\oracle_connection.hpp">
+      <Filter>zdb2\db\oracle</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\oracle\oracle_resultset.hpp">
+      <Filter>zdb2\db\oracle</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\oracle\oracle_stmt.hpp">
+      <Filter>zdb2\db\oracle</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\oracle\oracle_util.hpp">
+      <Filter>zdb2\db\oracle</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\postgresql\postgresql_connection.hpp">
+      <Filter>zdb2\db\postgresql</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\postgresql\postgresql_resultset.hpp">
+      <Filter>zdb2\db\postgresql</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\postgresql\postgresql_stmt.hpp">
+      <Filter>zdb2\db\postgresql</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\postgresql\postgresql_util.hpp">
+      <Filter>zdb2\db\postgresql</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

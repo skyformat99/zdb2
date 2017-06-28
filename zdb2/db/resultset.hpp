@@ -417,6 +417,9 @@ namespace zdb2
 		virtual tm get_datetime(const char * column_name) = 0;
 
 	protected:
+		virtual void _init() = 0;
+
+	protected:
 
 		std::size_t m_timeout = zdb2::DEFAULT_TIMEOUT;
 

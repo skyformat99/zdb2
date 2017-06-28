@@ -32,30 +32,13 @@ namespace zdb2
 			const char * sql,
 			std::size_t timeout
 		)
-			: stmt(timeout)
+			: stmt(sql,timeout)
 			, m_db(db)
 		{
-			if (!m_db || !sql || sql[0] == '\0')
+			if (!m_db)
 				throw std::runtime_error("error : invalid parameters.");
-
-			if (m_db && sql && *sql != '\0')
-			{
-				int status;
-				const char * tail;
-
-#if defined SQLITEUNLOCK && SQLITE_VERSION_NUMBER >= 3006012
-				status = sqlite_util::sqlite3_blocking_prepare_v2(m_db, sql, -1, &m_stmt, &tail);
-#elif SQLITE_VERSION_NUMBER >= 3004000
-				status = sqlite_util::execute(m_timeout, sqlite3_prepare_v2, m_db, sql, -1, &m_stmt, &tail);
-#else
-				status = sqlite_util::execute(m_timeout, sqlite3_prepare, m_db, sql, -1, &m_stmt, &tail);
-#endif
-
-				if (status == SQLITE_OK)
-				{
-					m_param_count = sqlite3_bind_parameter_count(m_stmt);
-				}
-			}
+			
+			_init();
 		}
 
 		virtual ~sqlite_stmt()
@@ -275,7 +258,30 @@ namespace zdb2
 
 
 		//@}
-		
+
+
+	protected:
+		virtual void _init() override
+		{
+			if (m_db && !m_sql.empty())
+			{
+				int status;
+				const char * tail;
+
+#if defined SQLITEUNLOCK && SQLITE_VERSION_NUMBER >= 3006012
+				status = sqlite_util::sqlite3_blocking_prepare_v2(m_db, m_sql.c_str(), -1, &m_stmt, &tail);
+#elif SQLITE_VERSION_NUMBER >= 3004000
+				status = sqlite_util::execute(m_timeout, sqlite3_prepare_v2, m_db, m_sql.c_str(), -1, &m_stmt, &tail);
+#else
+				status = sqlite_util::execute(m_timeout, sqlite3_prepare, m_db, m_sql.c_str(), -1, &m_stmt, &tail);
+#endif
+
+				if (status == SQLITE_OK)
+				{
+					m_param_count = sqlite3_bind_parameter_count(m_stmt);
+				}
+			}
+		}
 
 	protected:
 		sqlite3 * m_db = nullptr;

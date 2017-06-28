@@ -16,19 +16,18 @@
 #include <algorithm>
 #include <mutex>
 
-#include <mysql.h>
-#include <errmsg.h>
+#include <oci.h>
 
 #include <zdb2/db/stmt.hpp>
-#include <zdb2/db/mysql/mysql_util.hpp>
+#include <zdb2/db/postgresql/postgresql_util.hpp>
 
 namespace zdb2
 {
 
-	class mysql_stmt : public stmt
+	class postgresql_stmt : public stmt
 	{
 	public:
-		mysql_stmt(
+		postgresql_stmt(
 			MYSQL * db,
 			const char * sql,
 			std::size_t timeout
@@ -42,7 +41,7 @@ namespace zdb2
 			_init();
 		}
 
-		virtual ~mysql_stmt()
+		virtual ~postgresql_stmt()
 		{
 			close();
 		}
@@ -301,36 +300,12 @@ namespace zdb2
 
 
 		//@}
-		
+
 
 	protected:
 		virtual void _init() override
 		{
-			if (!m_sql.empty())
-			{
-				m_stmt = mysql_stmt_init(m_db);
-				if (m_stmt)
-				{
-					if (mysql_util::MYSQL_OK == mysql_stmt_prepare(m_stmt, m_sql.c_str(), (unsigned long)m_sql.length()))
-					{
-						m_param_count = (int)mysql_stmt_param_count(m_stmt);
 
-						if (m_param_count > 0)
-						{
-							m_params = new mysql_util::param_t[m_param_count];
-							std::memset(m_params, 0, sizeof(mysql_util::param_t) * m_param_count);
-
-							m_bind = new MYSQL_BIND[m_param_count];
-							std::memset(m_bind, 0, sizeof(MYSQL_BIND) * m_param_count);
-						}
-					}
-					else
-					{
-						mysql_stmt_close(m_stmt);
-						m_stmt = nullptr;
-					}
-				}
-			}
 		}
 
 	protected:

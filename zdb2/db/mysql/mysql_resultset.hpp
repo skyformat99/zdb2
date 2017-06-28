@@ -41,51 +41,10 @@ namespace zdb2
 			, m_stmt(stmt)
 		{
 			assert(m_stmt);
+			if (!m_stmt)
+				throw std::runtime_error("error : invalid parameters.");
 
-			if (m_stmt)
-			{
-				m_column_count = get_column_count();
-
-				m_meta = mysql_stmt_result_metadata(m_stmt);
-
-				if ((m_column_count <= 0) || !m_meta)
-				{
-					throw std::runtime_error(mysql_stmt_error(m_stmt));
-				}
-				else
-				{
-					m_bind = new MYSQL_BIND[m_column_count];
-					std::memset(m_bind, 0, sizeof(MYSQL_BIND) * m_column_count);
-
-					m_columns = new mysql_util::column_t[m_column_count];
-					std::memset(m_columns, 0, sizeof(mysql_util::column_t) * m_column_count);
-
-					for (int i = 0; i < m_column_count; i++)
-					{
-						m_columns[i].buffer = (char *)std::calloc(mysql_util::STRLEN + 1, sizeof(char));
-
-						m_bind[i].buffer_type = MYSQL_TYPE_STRING;
-						m_bind[i].buffer = m_columns[i].buffer;
-						m_bind[i].buffer_length = mysql_util::STRLEN;
-						m_bind[i].is_null = &m_columns[i].is_null;
-						m_bind[i].length = &m_columns[i].length;
-
-						m_columns[i].field = mysql_fetch_field_direct(m_meta, i);
-					}
-
-					if ((mysql_util::MYSQL_OK != mysql_stmt_bind_result(m_stmt, m_bind)))
-					{
-						throw std::runtime_error(mysql_stmt_error(m_stmt));
-					}
-
-					for (int col = 0; col < m_column_count; col++)
-					{
-						std::string col_name(get_column_name(col));
-						m_column_name_map.emplace(col_name, col);
-					}
-				}
-
-			}
+			_init();
 		}
 
 		virtual ~mysql_resultset()
@@ -659,6 +618,53 @@ namespace zdb2
 			}
 		}
 
+		virtual void _init() override
+		{
+			if (m_stmt)
+			{
+				m_column_count = get_column_count();
+
+				m_meta = mysql_stmt_result_metadata(m_stmt);
+
+				if ((m_column_count <= 0) || !m_meta)
+				{
+					throw std::runtime_error(mysql_stmt_error(m_stmt));
+				}
+				else
+				{
+					m_bind = new MYSQL_BIND[m_column_count];
+					std::memset(m_bind, 0, sizeof(MYSQL_BIND) * m_column_count);
+
+					m_columns = new mysql_util::column_t[m_column_count];
+					std::memset(m_columns, 0, sizeof(mysql_util::column_t) * m_column_count);
+
+					for (int i = 0; i < m_column_count; i++)
+					{
+						m_columns[i].buffer = (char *)std::calloc(mysql_util::STRLEN + 1, sizeof(char));
+
+						m_bind[i].buffer_type = MYSQL_TYPE_STRING;
+						m_bind[i].buffer = m_columns[i].buffer;
+						m_bind[i].buffer_length = mysql_util::STRLEN;
+						m_bind[i].is_null = &m_columns[i].is_null;
+						m_bind[i].length = &m_columns[i].length;
+
+						m_columns[i].field = mysql_fetch_field_direct(m_meta, i);
+					}
+
+					if ((mysql_util::MYSQL_OK != mysql_stmt_bind_result(m_stmt, m_bind)))
+					{
+						throw std::runtime_error(mysql_stmt_error(m_stmt));
+					}
+
+					for (int col = 0; col < m_column_count; col++)
+					{
+						std::string col_name(get_column_name(col));
+						m_column_name_map.emplace(col_name, col);
+					}
+				}
+
+			}
+		}
 
 	protected:
 
