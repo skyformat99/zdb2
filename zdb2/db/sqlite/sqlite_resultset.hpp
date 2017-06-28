@@ -40,21 +40,30 @@ namespace zdb2
 			, m_stmt(stmt)
 		{
 			assert(m_stmt);
-
-			int cols = get_column_count();
-			for (int col = 0; col < cols; col++)
+			if (m_stmt)
 			{
-				std::string col_name(get_column_name(col));
-				m_column_name_map.emplace(col_name, col);
+				int cols = get_column_count();
+				for (int col = 0; col < cols; col++)
+				{
+					std::string col_name(get_column_name(col));
+					m_column_name_map.emplace(col_name, col);
+				}
 			}
 		}
 
 		virtual ~sqlite_resultset()
 		{
-
+			close();
 		}
 
-
+		virtual void close() override
+		{
+			if (m_stmt)
+			{
+				sqlite3_finalize(m_stmt);
+				m_stmt = nullptr;
+			}
+		}
 		
 		/**
 		 * Returns the number of columns in this ResultSet object.
@@ -75,7 +84,7 @@ namespace zdb2
 		 * should use the method ResultSet_getColumnCount() to test for 
 		 * the availability of columns in the result set.
 		 */
-		virtual const char * get_column_name(int column_index)
+		virtual const char * get_column_name(int column_index) override
 		{
 			return (m_stmt ? sqlite3_column_name(m_stmt, column_index) : nullptr);
 		}
@@ -83,7 +92,7 @@ namespace zdb2
 		/**
 		 * @function : get column index by column name
 		 */
-		virtual int get_column_index(const char * column_name)
+		virtual int get_column_index(const char * column_name) override
 		{
 			auto iterator = m_column_name_map.find(column_name);
 			if (iterator != m_column_name_map.end())
@@ -103,7 +112,7 @@ namespace zdb2
 		 * @exception SQLException If columnIndex is outside the valid range
 		 * @see SQLException.h
 		 */
-		virtual std::size_t get_column_size(int column_index)
+		virtual std::size_t get_column_size(int column_index) override
 		{
 			return (m_stmt ? sqlite3_column_bytes(m_stmt, column_index) : 0);
 		}
@@ -122,7 +131,7 @@ namespace zdb2
 		 * more rows
 		 * @exception SQLException If a database access error occurs
 		 */
-		virtual bool next_row()
+		virtual bool next_row() override
 		{
 			if (!m_stmt)
 				return false;
@@ -156,7 +165,7 @@ namespace zdb2
 		 * columnIndex is outside the valid range
 		 * @see SQLException.h
 		 */
-		virtual bool is_null(int column_index)
+		virtual bool is_null(int column_index) override
 		{
 			return (m_stmt ? (sqlite3_column_type(m_stmt, column_index) == SQLITE_NULL) : true);
 		}
@@ -178,7 +187,7 @@ namespace zdb2
 		 * columnIndex is outside the valid range
 		 * @see SQLException.h
 		 */
-		virtual const char * get_string(int column_index)
+		virtual const char * get_string(int column_index) override
 		{
 			return (m_stmt ? (const char*)sqlite3_column_text(m_stmt, column_index) : nullptr);
 		}
@@ -198,7 +207,7 @@ namespace zdb2
 		 * columnName does not exist
 		 * @see SQLException.h
 		 */
-		virtual const char * get_string(const char * column_name)
+		virtual const char * get_string(const char * column_name) override
 		{
 			int col_index = get_column_index(column_name);
 			return ((col_index >= 0) ? get_string(col_index) : nullptr);
@@ -223,7 +232,7 @@ namespace zdb2
 		 * is outside the valid range or if the value is NaN
 		 * @see SQLException.h
 		 */
-		virtual int get_int(int column_index)
+		virtual int get_int(int column_index) override
 		{
 			return (m_stmt ? sqlite3_column_int(m_stmt, column_index) : -1);
 		}
@@ -247,7 +256,7 @@ namespace zdb2
 		 * does not exist or if the value is NaN
 		 * @see SQLException.h
 		 */
-		virtual int get_int(const char * column_name)
+		virtual int get_int(const char * column_name) override
 		{
 			int col_index = get_column_index(column_name);
 			return ((col_index >= 0) ? get_int(col_index) : -1);
@@ -273,7 +282,7 @@ namespace zdb2
 		 * columnIndex is outside the valid range or if the value is NaN
 		 * @see SQLException.h
 		 */
-		virtual int64_t get_int64(int column_index)
+		virtual int64_t get_int64(int column_index) override
 		{
 			return (m_stmt ? sqlite3_column_int64(m_stmt, column_index) : -1);
 		}
@@ -297,7 +306,7 @@ namespace zdb2
 		 * does not exist or if the value is NaN
 		 * @see SQLException.h
 		 */
-		virtual int64_t get_int64(const char * column_name)
+		virtual int64_t get_int64(const char * column_name) override
 		{
 			int col_index = get_column_index(column_name);
 			return ((col_index >= 0) ? get_int64(col_index) : -1);
@@ -317,7 +326,7 @@ namespace zdb2
 		 * is outside the valid range or if the value is NaN
 		 * @see SQLException.h
 		 */
-		virtual double get_double(int column_index)
+		virtual double get_double(int column_index) override
 		{
 			return (m_stmt ? sqlite3_column_double(m_stmt, column_index) : -1.f);
 		}
@@ -335,7 +344,7 @@ namespace zdb2
 		 * does not exist or if the value is NaN
 		 * @see SQLException.h
 		 */
-		virtual double get_double(const char * column_name)
+		virtual double get_double(const char * column_name) override
 		{
 			int col_index = get_column_index(column_name);
 			return ((col_index >= 0) ? get_double(col_index) : -1.f);
@@ -358,7 +367,7 @@ namespace zdb2
 		 * columnIndex is outside the valid range
 		 * @see SQLException.h
 		 */
-		virtual const void * get_blob(int column_index, std::size_t * size)
+		virtual const void * get_blob(int column_index, std::size_t * size) override
 		{
 			if (!m_stmt)
 				return nullptr;
@@ -383,7 +392,7 @@ namespace zdb2
 		 * columnName does not exist
 		 * @see SQLException.h
 		 */
-		virtual const void * get_blob(const char * column_name, std::size_t * size)
+		virtual const void * get_blob(const char * column_name, std::size_t * size) override
 		{
 			int col_index = get_column_index(column_name);
 			return ((col_index >= 0) ? get_blob(col_index, size) : nullptr);
@@ -420,7 +429,7 @@ namespace zdb2
 		 * or if the column value cannot be converted to a valid timestamp
 		 * @see SQLException.h PreparedStatement_setTimestamp
 		 */
-		virtual time_t get_timestamp(int column_index)
+		virtual time_t get_timestamp(int column_index) override
 		{
 			if (!m_stmt)
 				return (time_t)0;
@@ -457,7 +466,7 @@ namespace zdb2
 		 * converted to a valid timestamp
 		 * @see SQLException.h PreparedStatement_setTimestamp
 		 */
-		virtual time_t get_timestamp(const char * column_name)
+		virtual time_t get_timestamp(const char * column_name) override
 		{
 			int col_index = get_column_index(column_name);
 			return ((col_index >= 0) ? get_timestamp(col_index) : (time_t)0);
@@ -492,7 +501,7 @@ namespace zdb2
 		 * DateTime type
 		 * @see SQLException.h
 		 */
-		virtual tm get_datetime(int column_index)
+		virtual tm get_datetime(int column_index) override
 		{
 			struct tm tm = { 0 };
 			if (!m_stmt)
@@ -541,7 +550,7 @@ namespace zdb2
 		 * converted to a valid SQL Date, Time or DateTime type
 		 * @see SQLException.h
 		 */
-		virtual tm get_datetime(const char * column_name)
+		virtual tm get_datetime(const char * column_name) override
 		{
 			struct tm tm = { 0 };
 			int col_index = get_column_index(column_name);

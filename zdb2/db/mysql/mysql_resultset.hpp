@@ -10,38 +10,127 @@
 
 #pragma once
 
+#include <cassert>
 #include <cctype>
 #include <string>
 #include <memory>
 #include <algorithm>
 #include <mutex>
-#include <stdexcept>
+#include <unordered_map>
+#include <ctime>
 
-#include <zdb2/config.hpp>
+#include <mysql.h>
+#include <errmsg.h>
+
+#include <zdb2/db/resultset.hpp>
+#include <zdb2/db/mysql/mysql_util.hpp>
 
 namespace zdb2
 {
 
-	class resultset
+#pragma warning(disable:4996)
+
+	class mysql_resultset : public resultset
 	{
 	public:
-		resultset(std::size_t timeout = zdb2::DEFAULT_TIMEOUT) : m_timeout(timeout)
+		mysql_resultset(
+			MYSQL_STMT * stmt,
+			std::size_t timeout = zdb2::DEFAULT_TIMEOUT
+		)
+			: resultset(timeout)
+			, m_stmt(stmt)
 		{
+			assert(m_stmt);
+
+			if (m_stmt)
+			{
+				m_column_count = get_column_count();
+
+				m_meta = mysql_stmt_result_metadata(m_stmt);
+
+				if ((m_column_count <= 0) || !m_meta)
+				{
+					throw std::runtime_error(mysql_stmt_error(m_stmt));
+				}
+				else
+				{
+					m_bind = new MYSQL_BIND[m_column_count];
+					std::memset(m_bind, 0, sizeof(MYSQL_BIND) * m_column_count);
+
+					m_columns = new mysql_util::column_t[m_column_count];
+					std::memset(m_columns, 0, sizeof(mysql_util::column_t) * m_column_count);
+
+					for (int i = 0; i < m_column_count; i++)
+					{
+						m_columns[i].buffer = (char *)std::calloc(mysql_util::STRLEN + 1, sizeof(char));
+
+						m_bind[i].buffer_type = MYSQL_TYPE_STRING;
+						m_bind[i].buffer = m_columns[i].buffer;
+						m_bind[i].buffer_length = mysql_util::STRLEN;
+						m_bind[i].is_null = &m_columns[i].is_null;
+						m_bind[i].length = &m_columns[i].length;
+
+						m_columns[i].field = mysql_fetch_field_direct(m_meta, i);
+					}
+
+					if ((mysql_util::MYSQL_OK != mysql_stmt_bind_result(m_stmt, m_bind)))
+					{
+						throw std::runtime_error(mysql_stmt_error(m_stmt));
+					}
+
+					for (int col = 0; col < m_column_count; col++)
+					{
+						std::string col_name(get_column_name(col));
+						m_column_name_map.emplace(col_name, col);
+					}
+				}
+
+			}
 		}
 
-		virtual ~resultset()
+		virtual ~mysql_resultset()
 		{
-
+			close();
 		}
 
-		virtual void close() = 0;
+		virtual void close() override
+		{
+			if (m_stmt)
+			{
+				mysql_stmt_free_result(m_stmt);
+				mysql_stmt_close(m_stmt);
+				m_stmt = nullptr;
+			}
+			if (m_meta)
+			{
+				mysql_free_result(m_meta);
+				m_meta = nullptr;
+			}
+			if (m_bind)
+			{
+				delete[]m_bind;
+				m_bind = nullptr;
+			}
+			if (m_columns)
+			{
+				for (int i = 0; i < m_column_count; i++)
+				{
+					std::free((void *)m_columns[i].buffer);
+				}
+				delete[]m_columns;
+				m_columns = nullptr;
+			}
+		}
 		
 		/**
 		 * Returns the number of columns in this ResultSet object.
 		 * @param R A ResultSet object
 		 * @return The number of columns
 		 */
-		virtual int get_column_count() = 0;
+		virtual int get_column_count() override
+		{
+			return (m_stmt ? (int)mysql_stmt_field_count(m_stmt) : 0);
+		}
 
 
 		/**
@@ -52,9 +141,23 @@ namespace zdb2
 		 * should use the method ResultSet_getColumnCount() to test for 
 		 * the availability of columns in the result set.
 		 */
-		virtual const char * get_column_name(int column_index) = 0;
+		virtual const char * get_column_name(int column_index) override
+		{
+			if (m_column_count <= 0 || column_index < 0 || column_index >= m_column_count)
+				return nullptr;
+			return m_columns[column_index].field->name;
+		}
 
-		virtual int get_column_index(const char * column_name) = 0;
+		/**
+		 * @function : get column index by column name
+		 */
+		virtual int get_column_index(const char * column_name) override
+		{
+			auto iterator = m_column_name_map.find(column_name);
+			if (iterator != m_column_name_map.end())
+				return iterator->second;
+			return -1;
+		}
 
 		/**
 		 * Returns column size in bytes. If the column is a blob then 
@@ -68,7 +171,14 @@ namespace zdb2
 		 * @exception SQLException If columnIndex is outside the valid range
 		 * @see SQLException.h
 		 */
-		virtual std::size_t get_column_size(int column_index) = 0;
+		virtual std::size_t get_column_size(int column_index) override
+		{
+			if (m_column_count <= 0 || column_index < 0 || column_index >= m_column_count)
+				return 0;
+			if (m_columns[column_index].is_null)
+				return 0;
+			return m_columns[column_index].length;
+		}
 
 		//@}
 
@@ -84,7 +194,24 @@ namespace zdb2
 		 * more rows
 		 * @exception SQLException If a database access error occurs
 		 */
-		virtual bool next_row() = 0;
+		virtual bool next_row() override
+		{
+			if (!m_stmt || !m_meta || m_column_count <= 0)
+				return false;
+
+			if (m_need_rebind)
+			{
+				if ((mysql_util::MYSQL_OK != mysql_stmt_bind_result(m_stmt, m_bind)))
+					throw std::runtime_error(mysql_stmt_error(m_stmt));
+				m_need_rebind = false;
+			}
+
+			int status = mysql_stmt_fetch(m_stmt);
+			if (1 == status)
+				throw std::runtime_error(mysql_stmt_error(m_stmt));
+
+			return ((status == mysql_util::MYSQL_OK) || (status == MYSQL_DATA_TRUNCATED));
+		}
 
 		/** @name Columns */
 		//@{
@@ -102,7 +229,13 @@ namespace zdb2
 		 * columnIndex is outside the valid range
 		 * @see SQLException.h
 		 */
-		virtual bool is_null(int column_index) = 0;
+		virtual bool is_null(int column_index) override
+		{
+			if (m_column_count <= 0 || column_index < 0 || column_index >= m_column_count)
+				return true;
+
+			return (m_columns[column_index].is_null);
+		}
 
 
 
@@ -121,7 +254,20 @@ namespace zdb2
 		 * columnIndex is outside the valid range
 		 * @see SQLException.h
 		 */
-		virtual const char * get_string(int column_index) = 0;
+		virtual const char * get_string(int column_index) override
+		{
+			if (m_stmt && m_bind && m_columns && column_index >= 0 && column_index < m_column_count)
+			{
+				if (m_columns[column_index].is_null)
+					return nullptr;
+
+				_ensure_capacity(column_index);
+
+				m_columns[column_index].buffer[m_columns[column_index].length] = 0;
+				return m_columns[column_index].buffer;
+			}
+			return nullptr;
+		}
 
 
 		/**
@@ -138,7 +284,11 @@ namespace zdb2
 		 * columnName does not exist
 		 * @see SQLException.h
 		 */
-		virtual const char * get_string(const char * column_name) = 0;
+		virtual const char * get_string(const char * column_name) override
+		{
+			int col_index = get_column_index(column_name);
+			return ((col_index >= 0) ? get_string(col_index) : nullptr);
+		}
 
 
 		/**
@@ -159,7 +309,11 @@ namespace zdb2
 		 * is outside the valid range or if the value is NaN
 		 * @see SQLException.h
 		 */
-		virtual int get_int(int column_index) = 0;
+		virtual int get_int(int column_index) override
+		{
+			auto s = get_string(column_index);
+			return (s ? std::atoi(s) : -1);
+		}
 
 
 		/**
@@ -180,7 +334,11 @@ namespace zdb2
 		 * does not exist or if the value is NaN
 		 * @see SQLException.h
 		 */
-		virtual int get_int(const char * column_name) = 0;
+		virtual int get_int(const char * column_name) override
+		{
+			auto s = get_string(column_name);
+			return (s ? std::atoi(s) : -1);
+		}
 
 
 		/**
@@ -202,7 +360,11 @@ namespace zdb2
 		 * columnIndex is outside the valid range or if the value is NaN
 		 * @see SQLException.h
 		 */
-		virtual int64_t get_int64(int column_index) = 0;
+		virtual int64_t get_int64(int column_index) override
+		{
+			auto s = get_string(column_index);
+			return (s ? (int64_t)std::atoll(s) : -1);
+		}
 
 
 		/**
@@ -223,7 +385,11 @@ namespace zdb2
 		 * does not exist or if the value is NaN
 		 * @see SQLException.h
 		 */
-		virtual int64_t get_int64(const char * column_name) = 0;
+		virtual int64_t get_int64(const char * column_name) override
+		{
+			auto s = get_string(column_name);
+			return (s ? (int64_t)std::atoll(s) : -1);
+		}
 
 
 		/**
@@ -239,7 +405,11 @@ namespace zdb2
 		 * is outside the valid range or if the value is NaN
 		 * @see SQLException.h
 		 */
-		virtual double get_double(int column_index) = 0;
+		virtual double get_double(int column_index) override
+		{
+			auto s = get_string(column_index);
+			return (s ? std::atof(s) : -1.f);
+		}
 
 
 		/**
@@ -254,7 +424,11 @@ namespace zdb2
 		 * does not exist or if the value is NaN
 		 * @see SQLException.h
 		 */
-		virtual double get_double(const char * column_name) = 0;
+		virtual double get_double(const char * column_name) override
+		{
+			auto s = get_string(column_name);
+			return (s ? std::atof(s) : -1.f);
+		}
 
 
 		/**
@@ -273,7 +447,21 @@ namespace zdb2
 		 * columnIndex is outside the valid range
 		 * @see SQLException.h
 		 */
-		virtual const void * get_blob(int column_index,std::size_t * size) = 0;
+		virtual const void * get_blob(int column_index, std::size_t * size) override
+		{
+			if (m_stmt && m_bind && m_columns && column_index >= 0 && column_index < m_column_count)
+			{
+				if (m_columns[column_index].is_null)
+					return nullptr;
+
+				_ensure_capacity(column_index);
+
+				*size = m_columns[column_index].length;
+
+				return (const void *)m_columns[column_index].buffer;
+			}
+			return nullptr;
+		}
 
 
 		/**
@@ -291,7 +479,11 @@ namespace zdb2
 		 * columnName does not exist
 		 * @see SQLException.h
 		 */
-		virtual const void * get_blob(const char * column_name, std::size_t * size) = 0;
+		virtual const void * get_blob(const char * column_name, std::size_t * size) override
+		{
+			int col_index = get_column_index(column_name);
+			return ((col_index >= 0) ? get_blob(col_index, size) : nullptr);
+		}
 
 		//@}
 
@@ -324,7 +516,11 @@ namespace zdb2
 		 * or if the column value cannot be converted to a valid timestamp
 		 * @see SQLException.h PreparedStatement_setTimestamp
 		 */
-		virtual time_t get_timestamp(int column_index) = 0;
+		virtual time_t get_timestamp(int column_index) override
+		{
+			// Not integer storage class, try to parse as time string
+			return (time_t)0;
+		}
 
 
 		/**
@@ -353,7 +549,11 @@ namespace zdb2
 		 * converted to a valid timestamp
 		 * @see SQLException.h PreparedStatement_setTimestamp
 		 */
-		virtual time_t get_timestamp(const char * column_name) = 0;
+		virtual time_t get_timestamp(const char * column_name) override
+		{
+			int col_index = get_column_index(column_name);
+			return ((col_index >= 0) ? get_timestamp(col_index) : (time_t)0);
+		}
 
 
 		/**
@@ -384,7 +584,26 @@ namespace zdb2
 		 * DateTime type
 		 * @see SQLException.h
 		 */
-		virtual tm get_datetime(int column_index) = 0;
+		virtual tm get_datetime(int column_index) override
+		{
+			struct tm tm = { 0 };
+			if (!m_stmt)
+				return tm;
+			//if (sqlite3_column_type(m_stmt, column_index) == SQLITE_INTEGER)
+			//{
+			//	time_t utc = (time_t)sqlite3_column_int64(m_stmt, column_index);
+			//	struct tm * utc_tm = std::gmtime(&utc);
+			//	if (utc_tm)
+			//		utc_tm->tm_year += 1900; // Use year literal
+			//	return (*utc_tm);
+			//}
+			//else
+			//{
+			//	// Not integer storage class, try to parse as time string
+
+			//}
+			return tm;
+		}
 
 
 		/**
@@ -414,11 +633,48 @@ namespace zdb2
 		 * converted to a valid SQL Date, Time or DateTime type
 		 * @see SQLException.h
 		 */
-		virtual tm get_datetime(const char * column_name) = 0;
+		virtual tm get_datetime(const char * column_name) override
+		{
+			struct tm tm = { 0 };
+			int col_index = get_column_index(column_name);
+			return ((col_index >= 0) ? get_datetime(col_index) : tm);
+		}
 
 	protected:
 
-		std::size_t m_timeout = zdb2::DEFAULT_TIMEOUT;
+		void _ensure_capacity(int i)
+		{
+			if ((m_columns[i].length > m_bind[i].buffer_length))
+			{
+				/* Column was truncated, resize and fetch column directly. */
+				std::realloc(m_columns[i].buffer, m_columns[i].length + 1);
+
+				m_bind[i].buffer = m_columns[i].buffer;
+				m_bind[i].buffer_length = m_columns[i].length;
+
+				if ((mysql_util::MYSQL_OK != mysql_stmt_fetch_column(m_stmt, &m_bind[i], i, 0)))
+					throw std::runtime_error(mysql_stmt_error(m_stmt));
+
+				m_need_rebind = true;
+			}
+		}
+
+
+	protected:
+
+		MYSQL_STMT * m_stmt = nullptr;
+
+		MYSQL_RES * m_meta = nullptr;
+
+		std::unordered_map<std::string, int> m_column_name_map;
+
+		MYSQL_BIND * m_bind = nullptr;
+
+		mysql_util::column_t * m_columns = nullptr;
+
+		int m_column_count = 0;
+
+		bool m_need_rebind = false;
 
 	};
 

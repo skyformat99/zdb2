@@ -19,23 +19,33 @@
 #include <chrono>
 #include <functional>
 
-#include <sqlite3.h>
+#if defined(__unix__) || defined(__linux__)
+
+#elif defined(WIN32) || defined(_WIN32) || defined(_WIN64) || defined(_WINDOWS_)
+#include <windows.h>
+#endif
+
+
+#include <sql.h>
+#include <sqlext.h>
+#include <sqltypes.h>
+#include <odbcss.h>
 
 #include <zdb2/config.hpp>
 #include <zdb2/net/url.hpp>
 #include <zdb2/db/connection.hpp>
 
-#include <zdb2/db/sqlite/sqlite_util.hpp>
-#include <zdb2/db/sqlite/sqlite_stmt.hpp>
-#include <zdb2/db/sqlite/sqlite_resultset.hpp>
+#include <zdb2/db/sqlserver/sqlserver_util.hpp>
+#include <zdb2/db/sqlserver/sqlserver_stmt.hpp>
+#include <zdb2/db/sqlserver/sqlserver_resultset.hpp>
 
 namespace zdb2
 {
 
-	class sqlite_connection : public connection
+	class sqlserver_connection : public connection
 	{
 	public:
-		sqlite_connection(
+		sqlserver_connection(
 			std::shared_ptr<url> url_ptr,
 			std::size_t timeout = zdb2::DEFAULT_TIMEOUT
 		)
@@ -44,7 +54,7 @@ namespace zdb2
 			_init();
 		}
 
-		virtual ~sqlite_connection()
+		virtual ~sqlserver_connection()
 		{
 			close();
 		}
@@ -63,8 +73,6 @@ namespace zdb2
 		{
 			connection::set_query_timeout(ms);
 
-			if(m_db)
-				sqlite3_busy_timeout(m_db, (int)m_timeout);
 		}
 
 		//@}
@@ -78,7 +86,8 @@ namespace zdb2
 		 */
 		virtual bool ping() override
 		{
-			return (SQLITE_OK == _execute_sql("select 1;"));
+			int status = _execute_sql("select 1;");
+			return ((status == SQL_SUCCESS) || (status == SQL_SUCCESS_WITH_INFO));
 		}
 
 
@@ -102,11 +111,16 @@ namespace zdb2
 		 */
 		virtual void close() override
 		{
-			if (m_db)
+			if (m_hdbc)
 			{
-				while (sqlite3_close(m_db) == SQLITE_BUSY)
-					std::this_thread::sleep_for(std::chrono::milliseconds(10));
-				m_db = nullptr;
+				SQLDisconnect(m_hdbc);
+				SQLFreeHandle(SQL_HANDLE_DBC, m_hdbc);
+				m_hdbc = nullptr;
+			}
+			if (m_henv)
+			{
+				SQLFreeHandle(SQL_HANDLE_ENV, m_henv);
+				m_henv = nullptr;
 			}
 		}
 
@@ -119,7 +133,8 @@ namespace zdb2
 		 */
 		virtual bool begin_transaction() override
 		{
-			if (SQLITE_OK == _execute_sql("BEGIN TRANSACTION;"))
+			int status = _execute_sql("BEGIN TRANSACTION;");
+			if ((status == SQL_SUCCESS) || (status == SQL_SUCCESS_WITH_INFO))
 				return connection::begin_transaction();
 			return false;
 		}
@@ -139,7 +154,8 @@ namespace zdb2
 			{
 				if (connection::commit())
 				{
-					return (SQLITE_OK == _execute_sql("COMMIT TRANSACTION;"));
+					int status = _execute_sql("COMMIT TRANSACTION;");
+					return ((status == SQL_SUCCESS) || (status == SQL_SUCCESS_WITH_INFO));
 				}
 			}
 			return false;
@@ -161,7 +177,8 @@ namespace zdb2
 			{
 				if (connection::rollback())
 				{
-					return (SQLITE_OK == _execute_sql("ROLLBACK TRANSACTION;"));
+					int status = _execute_sql("ROLLBACK TRANSACTION;");
+					return ((status == SQL_SUCCESS) || (status == SQL_SUCCESS_WITH_INFO));
 				}
 			}
 			return false;
@@ -176,7 +193,8 @@ namespace zdb2
 		 */
 		virtual int64_t last_rowid() override
 		{
-			return (m_db ? sqlite3_last_insert_rowid(m_db) : 0);
+			int status = _execute_sql("select scope_identity()");
+			return ((status == SQL_SUCCESS) || (status == SQL_SUCCESS_WITH_INFO));
 		}
 
 
@@ -190,7 +208,7 @@ namespace zdb2
 		 */
 		virtual int64_t rows_changed() override
 		{
-			return (m_db ? (int64_t)sqlite3_changes(m_db) : 0);
+			return 0;
 		}
 
 
@@ -224,7 +242,8 @@ namespace zdb2
 
 			va_end(ap);
 			
-			return (_execute_sql(str.c_str()) == SQLITE_OK);
+			int status = _execute_sql(str.c_str());
+			return ((status == SQL_SUCCESS) || (status == SQL_SUCCESS_WITH_INFO));
 		}
 
 		/**
@@ -264,19 +283,19 @@ namespace zdb2
 
 			va_end(ap);
 
-			int status;
-			const char * tail;
-			sqlite3_stmt * stmt;
-
-#if defined SQLITEUNLOCK && SQLITE_VERSION_NUMBER >= 3006012
-			status = sqlite_util::sqlite3_blocking_prepare_v2(m_db, str.c_str(), (int)str.length(), &stmt, &tail);
-#elif SQLITE_VERSION_NUMBER >= 3004000
-			status = sqlite_util::execute(m_timeout, sqlite3_prepare_v2, m_db, str.c_str(), (int)str.length(), &stmt, &tail);
-#else
-			status = sqlite_util::execute(m_timeout, sqlite3_prepare, m_db, str.c_str(), (int)str.length(), &stmt, &tail);
-#endif
-			if (status == SQLITE_OK)
-				return std::dynamic_pointer_cast<resultset>(std::make_shared<sqlite_resultset>(stmt,m_timeout));
+			//int status;
+			//const char * tail;
+			//sqlite3_stmt * stmt;
+//
+//#if defined SQLITEUNLOCK && SQLITE_VERSION_NUMBER >= 3006012
+//			status = sqlite_util::sqlite3_blocking_prepare_v2(m_db, str.c_str(), (int)str.length(), &stmt, &tail);
+//#elif SQLITE_VERSION_NUMBER >= 3004000
+//			status = sqlite_util::execute(m_timeout, sqlite3_prepare_v2, m_db, str.c_str(), (int)str.length(), &stmt, &tail);
+//#else
+//			status = sqlite_util::execute(m_timeout, sqlite3_prepare, m_db, str.c_str(), (int)str.length(), &stmt, &tail);
+//#endif
+			//if (status == SQLITE_OK)
+			//	return std::dynamic_pointer_cast<resultset>(std::make_shared<sqlite_resultset>(stmt,m_timeout));
 
 			return nullptr;
 		}
@@ -318,7 +337,9 @@ namespace zdb2
 
 			va_end(ap);
 
-			return std::dynamic_pointer_cast<stmt>(std::make_shared<sqlite_stmt>(m_db,str.c_str(),m_timeout));
+			return nullptr;
+
+			//return std::dynamic_pointer_cast<stmt>(std::make_shared<sqlite_stmt>(m_db,str.c_str(),m_timeout));
 		}
 
 
@@ -334,7 +355,21 @@ namespace zdb2
 		 */
 		virtual const char * get_last_error() override
 		{
-			return sqlite3_errmsg(m_db);
+			//unsigned char szSQLSTATE[10];
+			//SDWORD nErr;
+			//unsigned char msg[SQL_MAX_MESSAGE_LENGTH + 1];
+			//SWORD cbmsg;
+
+			//unsigned char szData[256];   // Returned data storage
+
+			//while (SQLError(0, 0, hstmt, szSQLSTATE, &nErr, msg, sizeof(msg), &cbmsg) ==SQL_SUCCESS)
+			//{
+			//	snprintf((char *)szData, sizeof(szData), "Error:\nSQLSTATE=%s,Native error=%ld,msg='%s'", szSQLSTATE, nErr, msg);
+			//	//MessageBox(NULL,(const char *)szData,"ODBC Error",MB_OK);
+			//	//return NULL;
+			//	//return strdup(szData);
+			//}
+			return "";
 		}
 
 
@@ -403,50 +438,67 @@ namespace zdb2
 
 		virtual bool _connect() override
 		{
-			int status;
-			std::string path = m_url_ptr->get_dbname();
-			if (path.empty())
+			if (m_hdbc)
 			{
-				throw std::runtime_error("error : no database specified in url");
+				SQLFreeHandle(SQL_HANDLE_DBC, m_hdbc);
+				m_hdbc = nullptr;
+			}
+			if (m_henv)
+			{
+				SQLFreeHandle(SQL_HANDLE_ENV, m_henv);
+				m_henv = nullptr;
+			}
+
+			RETCODE retcode;
+
+			// 1.alloc env
+			//retcode = SQLAllocHandle(SQL_HANDLE_ENV, NULL, &m_henv);
+			//retcode = SQLSetEnvAttr(m_henv, SQL_ATTR_ODBC_VERSION, (SQLPOINTER)SQL_OV_ODBC3, SQL_IS_INTEGER);
+			retcode = SQLAllocEnv(&m_henv);
+
+			// 2.connect
+			//retcode = SQLAllocHandle(SQL_HANDLE_DBC, m_henv, &m_hdbc);
+			retcode = SQLAllocConnect(m_henv, &m_hdbc);
+			retcode = SQLSetConnectAttr(m_hdbc, SQL_LOGIN_TIMEOUT, (SQLPOINTER *)5, 0);
+
+			std::string user = m_url_ptr->get_param_value("user");
+			std::string pass = m_url_ptr->get_param_value("password");
+			if (user.empty() || pass.empty())
+			{
+				throw std::runtime_error("error : url string is invalid,can't find the user and password parameters.");
 				return false;
 			}
-			/* Shared cache mode help reduce database lock problems if libzdb is used with many threads */
-#if SQLITE_VERSION_NUMBER >= 3005000
-#ifndef DARWIN
-			/*
-			SQLite doc e.al.: "sqlite3_enable_shared_cache is disabled on MacOS X 10.7 and iOS version 5.0 and
-			will always return SQLITE_MISUSE. On those systems, shared cache mode should be enabled
-			per-database connection via sqlite3_open_v2() with SQLITE_OPEN_SHAREDCACHE".
-			As of OS X 10.10.4 this method is still deprecated and it is unclear if the recomendation above
-			holds as SQLite from 3.5 requires that both sqlite3_enable_shared_cache() _and_
-			sqlite3_open_v2(SQLITE_OPEN_SHAREDCACHE) is used to enable shared cache (!).
-			*/
-			sqlite3_enable_shared_cache(true);
-#endif
-			status = sqlite3_open_v2(path.c_str(), &m_db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_SHAREDCACHE, NULL);
-#else
-			status = sqlite3_open(path.c_str(), &m_db);
-#endif
-			if (SQLITE_OK != status)
+
+			retcode = SQLConnect(
+				m_hdbc,
+				(SQLCHAR *)m_url_ptr->get_dbname().c_str(),
+				SQL_NTS,
+				(SQLCHAR *)user.c_str(),
+				SQL_NTS,
+				(SQLCHAR *)pass.c_str(),
+				SQL_NTS
+			);
+
+			if ((retcode == SQL_SUCCESS) || (retcode == SQL_SUCCESS_WITH_INFO))
 			{
-				throw std::runtime_error("error : cannot open database,check if the database file exists.");
-				sqlite3_close(m_db);
-				return false;
+				return true;
 			}
-			return true;
+
+			return false;
 		}
 
 
 		int _execute_sql(const char * sql)
 		{
-#if defined SQLITEUNLOCK && SQLITE_VERSION_NUMBER >= 3006012
-			return sqlite_util::sqlite3_blocking_exec(m_db, sql, nullptr, nullptr, nullptr);
-#else
-			return sqlite_util::execute(m_timeout, sqlite3_exec, m_db, sql, nullptr, nullptr, nullptr);
-#endif
+			SQLHSTMT hstmt;
+			SQLAllocStmt(m_hdbc, &hstmt);
+			int status = SQLExecDirect(hstmt, (SQLCHAR *)sql, SQL_NTS);
+			SQLFreeStmt(hstmt, SQL_DROP);
+			return status;
 		}
 
-		sqlite3 * m_db = nullptr;
+		SQLHENV m_henv = nullptr;
+		SQLHDBC m_hdbc = nullptr;
 	};
 
 }

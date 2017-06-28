@@ -28,6 +28,12 @@
     <Filter Include="zdb2\db\sqlite">
       <UniqueIdentifier>{ffe4f35f-f0f7-4792-9375-df19e7db2260}</UniqueIdentifier>
     </Filter>
+    <Filter Include="zdb2\db\sqlserver">
+      <UniqueIdentifier>{dbad589f-7593-4337-a579-75cdc66ce5e0}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="zdb2\db\mysql">
+      <UniqueIdentifier>{43f24907-5980-453b-a3a8-be01ae93cca8}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\main.cpp">
@@ -73,6 +79,30 @@
     </ClInclude>
     <ClInclude Include="..\..\zdb2\db\sqlite\sqlite_util.hpp">
       <Filter>zdb2\db\sqlite</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\sqlserver\sqlserver_connection.hpp">
+      <Filter>zdb2\db\sqlserver</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\sqlserver\sqlserver_resultset.hpp">
+      <Filter>zdb2\db\sqlserver</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\sqlserver\sqlserver_stmt.hpp">
+      <Filter>zdb2\db\sqlserver</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\sqlserver\sqlserver_util.hpp">
+      <Filter>zdb2\db\sqlserver</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\mysql\mysql_connection.hpp">
+      <Filter>zdb2\db\mysql</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\mysql\mysql_resultset.hpp">
+      <Filter>zdb2\db\mysql</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\mysql\mysql_stmt.hpp">
+      <Filter>zdb2\db\mysql</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\mysql\mysql_util.hpp">
+      <Filter>zdb2\db\mysql</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

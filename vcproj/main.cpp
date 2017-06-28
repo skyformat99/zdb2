@@ -44,19 +44,19 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	std::shared_ptr<zdb2::url> url_ptr = std::make_shared<zdb2::url>("sqlite://engine.db3?synchronous=normal&heap_limit=8000&foreign_keys=on");
+	//std::shared_ptr<zdb2::url> url_ptr = std::make_shared<zdb2::url>("sqlite://engine.db3?synchronous=normal&heap_limit=8000&foreign_keys=on");
+	std::shared_ptr<zdb2::url> url_ptr = std::make_shared<zdb2::url>("mysql://localhost:3306/locapi?user=root&password=123456");
 
 	std::shared_ptr<zdb2::pool> pool_ptr = std::make_shared<zdb2::pool>(url_ptr);
 
 	std::shared_ptr<zdb2::connection> conn = pool_ptr->get();
 
-	conn->execute("update tbl_global_config set beat_port=%u", 1111);
+	conn->execute("update tbl_anchor set x=%f", 12.34);
 
-	auto result = conn->query("select * from tbl_global_config");
+	auto result = conn->query("select * from tbl_anchor");
 	if (result->next_row())
 	{
-		auto beat_port = result->get_string("beat_port");
-		std::printf("beat_port = %s loca_port=%d loca_mode=%s\n", beat_port, result->get_int("loca_port"), result->get_string("loca_mode"));
+		std::printf("id = %lld name=%s\n", result->get_int64("id"), result->get_string("name"));
 	}
 
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64) || defined(_WINDOWS_)

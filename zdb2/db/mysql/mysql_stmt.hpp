@@ -16,19 +16,20 @@
 #include <algorithm>
 #include <mutex>
 
-#include <sqlite3.h>
+#include <mysql.h>
+#include <errmsg.h>
 
 #include <zdb2/db/stmt.hpp>
-#include <zdb2/db/sqlite/sqlite_util.hpp>
+#include <zdb2/db/mysql/mysql_util.hpp>
 
 namespace zdb2
 {
 
-	class sqlite_stmt : public stmt
+	class mysql_stmt : public stmt
 	{
 	public:
-		sqlite_stmt(
-			sqlite3 * db,
+		mysql_stmt(
+			MYSQL * db,
 			const char * sql,
 			std::size_t timeout
 		)
@@ -38,27 +39,30 @@ namespace zdb2
 			if (!m_db || !sql || sql[0] == '\0')
 				throw std::runtime_error("error : invalid parameters.");
 
-			if (m_db && sql && *sql != '\0')
+			m_stmt = mysql_stmt_init(m_db);
+			if (m_stmt)
 			{
-				int status;
-				const char * tail;
-
-#if defined SQLITEUNLOCK && SQLITE_VERSION_NUMBER >= 3006012
-				status = sqlite_util::sqlite3_blocking_prepare_v2(m_db, sql, -1, &m_stmt, &tail);
-#elif SQLITE_VERSION_NUMBER >= 3004000
-				status = sqlite_util::execute(m_timeout, sqlite3_prepare_v2, m_db, sql, -1, &m_stmt, &tail);
-#else
-				status = sqlite_util::execute(m_timeout, sqlite3_prepare, m_db, sql, -1, &m_stmt, &tail);
-#endif
-
-				if (status == SQLITE_OK)
+				if (mysql_util::MYSQL_OK == mysql_stmt_prepare(m_stmt, sql, (unsigned long)std::strlen(sql)))
 				{
-					m_param_count = sqlite3_bind_parameter_count(m_stmt);
+					m_param_count = (int)mysql_stmt_param_count(m_stmt);
+
+					if (m_param_count > 0)
+					{
+						m_params = new mysql_util::param_t[m_param_count];
+						std::memset(m_params, 0, sizeof(mysql_util::param_t) * m_param_count);
+
+						m_bind = new MYSQL_BIND[m_param_count];
+						std::memset(m_bind, 0, sizeof(MYSQL_BIND) * m_param_count);
+					}
+				}
+				else
+				{
+					mysql_stmt_close(m_stmt);
 				}
 			}
 		}
 
-		virtual ~sqlite_stmt()
+		virtual ~mysql_stmt()
 		{
 			close();
 		}
@@ -67,8 +71,18 @@ namespace zdb2
 		{
 			if (m_stmt)
 			{
-				sqlite3_finalize(m_stmt);
+				mysql_stmt_close(m_stmt);
 				m_stmt = nullptr;
+			}
+			if (m_bind)
+			{
+				delete[]m_bind;
+				m_bind = nullptr;
+			}
+			if (m_params)
+			{
+				delete[]m_params;
+				m_params = nullptr;
 			}
 		}
 
@@ -88,12 +102,23 @@ namespace zdb2
 		*/
 		virtual void set_string(int param_index, const char * x) override
 		{
-			if (m_stmt)
+			if (m_stmt && m_bind && m_params && param_index >= 0)
 			{
-				sqlite3_reset(m_stmt);
-				int size = x ? (int)std::strlen(x) : 0;
-				if (SQLITE_RANGE == sqlite3_bind_text(m_stmt, param_index, x, size, SQLITE_STATIC))
-					throw std::runtime_error("error : parameter index is out of range.");
+				m_bind[param_index].buffer_type = MYSQL_TYPE_STRING;
+				m_bind[param_index].buffer = (char*)x;
+
+				if (!x)
+				{
+					m_params[param_index].length = 0;
+					m_bind[param_index].is_null = const_cast<my_bool *>(&mysql_util::yes);
+				}
+				else
+				{
+					m_params[param_index].length = (unsigned long)std::strlen(x);
+					m_bind[param_index].is_null = const_cast<my_bool *>(&mysql_util::no);
+				}
+
+				m_bind[param_index].length = &m_params[param_index].length;
 			}
 		}
 
@@ -116,11 +141,12 @@ namespace zdb2
 		 */
 		virtual void set_int(int param_index, int x) override
 		{
-			if (m_stmt)
+			if (m_stmt && m_bind && m_params && param_index >= 0)
 			{
-				sqlite3_reset(m_stmt);
-				if (SQLITE_RANGE == sqlite3_bind_int(m_stmt, param_index, x))
-					throw std::runtime_error("error : parameter index is out of range.");
+				m_params[param_index].type.integer = x;
+				m_bind[param_index].buffer_type = MYSQL_TYPE_LONG;
+				m_bind[param_index].buffer = &m_params[param_index].type.integer;
+				m_bind[param_index].is_null = const_cast<my_bool *>(&mysql_util::no);
 			}
 		}
 
@@ -143,11 +169,12 @@ namespace zdb2
 		 */
 		virtual void set_int64(int param_index, int64_t x) override
 		{
-			if (m_stmt)
+			if (m_stmt && m_bind && m_params && param_index >= 0)
 			{
-				sqlite3_reset(m_stmt);
-				if (SQLITE_RANGE == sqlite3_bind_int64(m_stmt, param_index, x))
-					throw std::runtime_error("error : parameter index is out of range.");
+				m_params[param_index].type.llong = x;
+				m_bind[param_index].buffer_type = MYSQL_TYPE_LONGLONG;
+				m_bind[param_index].buffer = &m_params[param_index].type.llong;
+				m_bind[param_index].is_null = const_cast<my_bool *>(&mysql_util::no);
 			}
 		}
 
@@ -164,11 +191,12 @@ namespace zdb2
 		 */
 		virtual void set_double(int param_index, double x) override
 		{
-			if (m_stmt)
+			if (m_stmt && m_bind && m_params && param_index >= 0)
 			{
-				sqlite3_reset(m_stmt);
-				if (SQLITE_RANGE == sqlite3_bind_double(m_stmt, param_index, x))
-					throw std::runtime_error("error : parameter index is out of range.");
+				m_params[param_index].type.real = x;
+				m_bind[param_index].buffer_type = MYSQL_TYPE_DOUBLE;
+				m_bind[param_index].buffer = &m_params[param_index].type.real;
+				m_bind[param_index].is_null = const_cast<my_bool *>(&mysql_util::no);
 			}
 		}
 
@@ -186,11 +214,23 @@ namespace zdb2
 		 */
 		virtual void set_blob(int param_index, const void * x, std::size_t size) override
 		{
-			if (m_stmt)
+			if (m_stmt && m_bind && m_params && param_index >= 0)
 			{
-				sqlite3_reset(m_stmt);
-				if (SQLITE_RANGE == sqlite3_bind_blob(m_stmt, param_index, x, (int)size, SQLITE_STATIC))
-					throw std::runtime_error("error : parameter index is out of range.");
+				m_bind[param_index].buffer_type = MYSQL_TYPE_BLOB;
+				m_bind[param_index].buffer = (void*)x;
+
+				if (!x)
+				{
+					m_params[param_index].length = 0;
+					m_bind[param_index].is_null = const_cast<my_bool *>(&mysql_util::yes);
+				}
+				else
+				{
+					m_params[param_index].length = (unsigned long)size;
+					m_bind[param_index].is_null = const_cast<my_bool *>(&mysql_util::no);
+				}
+
+				m_bind[param_index].length = &m_params[param_index].length;
 			}
 		}
 
@@ -213,11 +253,21 @@ namespace zdb2
 		 */
 		virtual void set_timestamp(int param_index, time_t x) override
 		{
-			if (m_stmt)
+			if (m_stmt && m_bind && m_params && param_index >= 0)
 			{
-				sqlite3_reset(m_stmt);
-				if (SQLITE_RANGE == sqlite3_bind_int64(m_stmt, param_index, x))
-					throw std::runtime_error("error : parameter index is out of range.");
+				struct tm * ptm = std::gmtime(const_cast<const time_t *>(&x));
+
+				m_params[param_index].type.timestamp.year = ptm->tm_year + 1900;
+				m_params[param_index].type.timestamp.month = ptm->tm_mon + 1;
+				m_params[param_index].type.timestamp.day = ptm->tm_mday;
+				m_params[param_index].type.timestamp.hour = ptm->tm_hour;
+				m_params[param_index].type.timestamp.minute = ptm->tm_min;
+				m_params[param_index].type.timestamp.second = ptm->tm_sec;
+
+				m_bind[param_index].buffer_type = MYSQL_TYPE_TIMESTAMP;
+				m_bind[param_index].buffer = &m_params[param_index].type.timestamp;
+
+				m_bind[param_index].is_null = const_cast<my_bool *>(&mysql_util::no);
 			}
 		}
 
@@ -233,25 +283,21 @@ namespace zdb2
 		 */
 		virtual void execute() override
 		{
-			int status = 0;
-#if defined SQLITEUNLOCK && SQLITE_VERSION_NUMBER >= 3006012
-			status = sqlite_util::sqlite3_blocking_step(m_stmt);
-#else
-			status = sqlite_util::execute(m_timeout, sqlite3_step, m_stmt);
-#endif
-			switch (status)
+			if (m_param_count > 0 && m_stmt && m_bind && m_params)
 			{
-			case SQLITE_DONE:
-				status = sqlite3_reset(m_stmt);
-				break;
-			case SQLITE_ROW:
-				status = sqlite3_reset(m_stmt);
-				throw std::runtime_error("error : select statement not allowed in execute().");
-				break;
-			default:
-				status = sqlite3_reset(m_stmt);
-				throw std::runtime_error(sqlite3_errmsg(m_db));
-				break;
+				if (mysql_util::MYSQL_OK != mysql_stmt_bind_param(m_stmt, m_bind))
+					throw std::runtime_error(mysql_stmt_error(m_stmt));
+
+#if MYSQL_VERSION_ID >= 50002
+				unsigned long cursor = CURSOR_TYPE_NO_CURSOR;
+				mysql_stmt_attr_set(m_stmt, STMT_ATTR_CURSOR_TYPE, &cursor);
+#endif
+
+				if ((mysql_util::MYSQL_OK != mysql_stmt_execute(m_stmt)))
+					throw std::runtime_error(mysql_stmt_error(m_stmt));
+
+				/* Discard prepared param data in client/server */
+				mysql_stmt_reset(m_stmt);
 			}
 		}
 
@@ -266,7 +312,7 @@ namespace zdb2
 		 */
 		virtual int64_t rows_changed() override
 		{
-			return (m_db ? (int64_t)sqlite3_changes(m_db) : 0);
+			return (m_stmt ? (int64_t)mysql_stmt_affected_rows(m_stmt) : 0);
 		}
 
 
@@ -278,10 +324,13 @@ namespace zdb2
 		
 
 	protected:
-		sqlite3 * m_db = nullptr;
+		MYSQL * m_db = nullptr;
 
-		sqlite3_stmt * m_stmt = nullptr;
+		MYSQL_STMT * m_stmt = nullptr;
 
+		MYSQL_BIND * m_bind = nullptr;
+
+		mysql_util::param_t * m_params = nullptr;
 	};
 
 }

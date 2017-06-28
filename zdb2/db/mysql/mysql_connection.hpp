@@ -19,23 +19,24 @@
 #include <chrono>
 #include <functional>
 
-#include <sqlite3.h>
+#include <mysql.h>
+#include <errmsg.h>
 
 #include <zdb2/config.hpp>
 #include <zdb2/net/url.hpp>
 #include <zdb2/db/connection.hpp>
 
-#include <zdb2/db/sqlite/sqlite_util.hpp>
-#include <zdb2/db/sqlite/sqlite_stmt.hpp>
-#include <zdb2/db/sqlite/sqlite_resultset.hpp>
+#include <zdb2/db/mysql/mysql_util.hpp>
+#include <zdb2/db/mysql/mysql_stmt.hpp>
+#include <zdb2/db/mysql/mysql_resultset.hpp>
 
 namespace zdb2
 {
 
-	class sqlite_connection : public connection
+	class mysql_connection : public connection
 	{
 	public:
-		sqlite_connection(
+		mysql_connection(
 			std::shared_ptr<url> url_ptr,
 			std::size_t timeout = zdb2::DEFAULT_TIMEOUT
 		)
@@ -44,7 +45,7 @@ namespace zdb2
 			_init();
 		}
 
-		virtual ~sqlite_connection()
+		virtual ~mysql_connection()
 		{
 			close();
 		}
@@ -63,8 +64,6 @@ namespace zdb2
 		{
 			connection::set_query_timeout(ms);
 
-			if(m_db)
-				sqlite3_busy_timeout(m_db, (int)m_timeout);
 		}
 
 		//@}
@@ -78,7 +77,7 @@ namespace zdb2
 		 */
 		virtual bool ping() override
 		{
-			return (SQLITE_OK == _execute_sql("select 1;"));
+			return (m_db ? (mysql_ping(m_db) == mysql_util::MYSQL_OK) : false);
 		}
 
 
@@ -104,8 +103,7 @@ namespace zdb2
 		{
 			if (m_db)
 			{
-				while (sqlite3_close(m_db) == SQLITE_BUSY)
-					std::this_thread::sleep_for(std::chrono::milliseconds(10));
+				mysql_close(m_db);
 				m_db = nullptr;
 			}
 		}
@@ -119,8 +117,11 @@ namespace zdb2
 		 */
 		virtual bool begin_transaction() override
 		{
-			if (SQLITE_OK == _execute_sql("BEGIN TRANSACTION;"))
-				return connection::begin_transaction();
+			if (m_db)
+			{
+				if (mysql_util::MYSQL_OK == mysql_query(m_db, "START TRANSACTION;"))
+					return connection::begin_transaction();
+			}
 			return false;
 		}
 
@@ -135,11 +136,14 @@ namespace zdb2
 		 */
 		virtual bool commit() override
 		{
-			if (is_intransaction())
+			if (m_db)
 			{
-				if (connection::commit())
+				if (is_intransaction())
 				{
-					return (SQLITE_OK == _execute_sql("COMMIT TRANSACTION;"));
+					if (connection::commit())
+					{
+						return (mysql_util::MYSQL_OK == mysql_query(m_db, "COMMIT;"));
+					}
 				}
 			}
 			return false;
@@ -157,11 +161,14 @@ namespace zdb2
 		 */
 		virtual bool rollback() override
 		{
-			if (is_intransaction())
+			if (m_db)
 			{
-				if (connection::rollback())
+				if (is_intransaction())
 				{
-					return (SQLITE_OK == _execute_sql("ROLLBACK TRANSACTION;"));
+					if (connection::rollback())
+					{
+						return (mysql_util::MYSQL_OK == mysql_query(m_db, "ROLLBACK;"));
+					}
 				}
 			}
 			return false;
@@ -176,7 +183,7 @@ namespace zdb2
 		 */
 		virtual int64_t last_rowid() override
 		{
-			return (m_db ? sqlite3_last_insert_rowid(m_db) : 0);
+			return (m_db ? (int64_t)mysql_insert_id(m_db) : 0);
 		}
 
 
@@ -190,7 +197,7 @@ namespace zdb2
 		 */
 		virtual int64_t rows_changed() override
 		{
-			return (m_db ? (int64_t)sqlite3_changes(m_db) : 0);
+			return (m_db ? (int64_t)mysql_affected_rows(m_db) : 0);
 		}
 
 
@@ -224,7 +231,7 @@ namespace zdb2
 
 			va_end(ap);
 			
-			return (_execute_sql(str.c_str()) == SQLITE_OK);
+			return (mysql_util::MYSQL_OK == mysql_real_query(m_db, str.c_str(), (unsigned long)str.length()));
 		}
 
 		/**
@@ -246,9 +253,9 @@ namespace zdb2
 		 * @see ResultSet.h
 		 * @see SQLException.h
 		 */
-		virtual std::shared_ptr<resultset> query(const char *sql, ...)
+		virtual std::shared_ptr<resultset> query(const char *sql, ...) override
 		{
-			if (!sql || sql[0] == '\0')
+			if (!m_db || !sql || sql[0] == '\0')
 				return nullptr;
 
 			va_list ap, ap_copy;
@@ -264,21 +271,28 @@ namespace zdb2
 
 			va_end(ap);
 
-			int status;
-			const char * tail;
-			sqlite3_stmt * stmt;
+			MYSQL_STMT * stmt = mysql_stmt_init(m_db);
+			if (!stmt)
+				return nullptr;
 
-#if defined SQLITEUNLOCK && SQLITE_VERSION_NUMBER >= 3006012
-			status = sqlite_util::sqlite3_blocking_prepare_v2(m_db, str.c_str(), (int)str.length(), &stmt, &tail);
-#elif SQLITE_VERSION_NUMBER >= 3004000
-			status = sqlite_util::execute(m_timeout, sqlite3_prepare_v2, m_db, str.c_str(), (int)str.length(), &stmt, &tail);
-#else
-			status = sqlite_util::execute(m_timeout, sqlite3_prepare, m_db, str.c_str(), (int)str.length(), &stmt, &tail);
+			if (mysql_util::MYSQL_OK != mysql_stmt_prepare(stmt, str.c_str(), (unsigned long)str.length()))
+			{
+				mysql_stmt_close(stmt);
+				return nullptr;
+			}
+
+#if MYSQL_VERSION_ID >= 50002
+			unsigned long cursor = CURSOR_TYPE_READ_ONLY;
+			mysql_stmt_attr_set(stmt, STMT_ATTR_CURSOR_TYPE, &cursor);
 #endif
-			if (status == SQLITE_OK)
-				return std::dynamic_pointer_cast<resultset>(std::make_shared<sqlite_resultset>(stmt,m_timeout));
 
-			return nullptr;
+			if ((mysql_util::MYSQL_OK != mysql_stmt_execute(stmt)))
+			{
+				mysql_stmt_close(stmt);
+				return nullptr;
+			}
+
+			return std::dynamic_pointer_cast<resultset>(std::make_shared<mysql_resultset>(stmt, m_timeout));
 		}
 
 		/**
@@ -318,7 +332,7 @@ namespace zdb2
 
 			va_end(ap);
 
-			return std::dynamic_pointer_cast<stmt>(std::make_shared<sqlite_stmt>(m_db,str.c_str(),m_timeout));
+			return std::dynamic_pointer_cast<stmt>(std::make_shared<mysql_stmt>(m_db,str.c_str(),m_timeout));
 		}
 
 
@@ -334,7 +348,7 @@ namespace zdb2
 		 */
 		virtual const char * get_last_error() override
 		{
-			return sqlite3_errmsg(m_db);
+			return mysql_error(m_db);
 		}
 
 
@@ -359,94 +373,98 @@ namespace zdb2
 	protected:
 		virtual bool _init() override
 		{
-			if (!_connect())
-				return false;
- 
-			// There is no PRAGMA for heap limit as of sqlite-3.7.0, so we make it a configurable property using "heap_limit" [kB]
-			std::string heap_limit = m_url_ptr->get_param_value("heap_limit");
-			if (!heap_limit.empty())
-			{
-#if defined(HAVE_SQLITE3_SOFT_HEAP_LIMIT64)
-				sqlite3_soft_heap_limit64(Str_parseInt(URL_getParameter(C->url, properties[i])) * 1024);
-#elif defined(HAVE_SQLITE3_SOFT_HEAP_LIMIT)
-				sqlite3_soft_heap_limit(Str_parseInt(URL_getParameter(C->url, properties[i])) * 1024);
-#endif
-			}
-
-			// parse other params 
-			std::string params;
-			m_url_ptr->for_each_param([&params](std::pair<std::string, std::string> pair)
-			{
-				if (!pair.first.empty() && !pair.second.empty() && pair.first != "heap_limit")
-				{
-					params += "PRAGMA ";
-					params += pair.first;
-					params += " = ";
-					params += pair.second;
-					params += "; ";
-				}
-			});
-
-			// execute extra params
-			if (!params.empty())
-			{
-				if (SQLITE_OK != _execute_sql(params.c_str()))
-				{
-					close();
-					throw std::runtime_error("error : unable to set database pragmas.");
-					return false;
-				}
-			}
-
-			return true;
+			return _connect();
 		}
 
 		virtual bool _connect() override
 		{
-			int status;
-			std::string path = m_url_ptr->get_dbname();
-			if (path.empty())
+			unsigned long client_flags = CLIENT_MULTI_STATEMENTS;
+			int connect_timeout = zdb2::DEFAULT_TCP_TIMEOUT;
+
+			std::string unix_socket = m_url_ptr->get_param_value("unix-socket");
+			std::string user = m_url_ptr->get_param_value("user");
+			std::string pass = m_url_ptr->get_param_value("password");
+			std::string host = m_url_ptr->get_host();
+			std::string port = m_url_ptr->get_port();
+			std::string database = m_url_ptr->get_dbname();
+			std::string timeout = m_url_ptr->get_param_value("connect-timeout");
+			std::string charset = m_url_ptr->get_param_value("charset");
+
+			if (!unix_socket.empty())
 			{
-				throw std::runtime_error("error : no database specified in url");
+				host = "localhost"; // Make sure host is localhost if unix socket is to be used
+			}
+			else if (host.empty())
+			{
+				throw std::runtime_error("error : no host specified in url.");
 				return false;
 			}
-			/* Shared cache mode help reduce database lock problems if libzdb is used with many threads */
-#if SQLITE_VERSION_NUMBER >= 3005000
-#ifndef DARWIN
-			/*
-			SQLite doc e.al.: "sqlite3_enable_shared_cache is disabled on MacOS X 10.7 and iOS version 5.0 and
-			will always return SQLITE_MISUSE. On those systems, shared cache mode should be enabled
-			per-database connection via sqlite3_open_v2() with SQLITE_OPEN_SHAREDCACHE".
-			As of OS X 10.10.4 this method is still deprecated and it is unclear if the recomendation above
-			holds as SQLite from 3.5 requires that both sqlite3_enable_shared_cache() _and_
-			sqlite3_open_v2(SQLITE_OPEN_SHAREDCACHE) is used to enable shared cache (!).
-			*/
-			sqlite3_enable_shared_cache(true);
-#endif
-			status = sqlite3_open_v2(path.c_str(), &m_db, SQLITE_OPEN_READWRITE | SQLITE_OPEN_CREATE | SQLITE_OPEN_SHAREDCACHE, NULL);
-#else
-			status = sqlite3_open(path.c_str(), &m_db);
-#endif
-			if (SQLITE_OK != status)
+			if (port.empty())
 			{
-				throw std::runtime_error("error : cannot open database,check if the database file exists.");
-				sqlite3_close(m_db);
+				throw std::runtime_error("error : no port specified in url.");
 				return false;
 			}
-			return true;
-		}
+			if (database.empty())
+			{
+				throw std::runtime_error("error : no database specified in url.");
+				return false;
+			}
+			if (user.empty())
+			{
+				throw std::runtime_error("error : no username specified in url.");
+				return false;
+			}
+			if (pass.empty())
+			{
+				throw std::runtime_error("error : no password specified in url.");
+				return false;
+			}
 
+			m_db = mysql_init(nullptr);
+			if (!m_db)
+			{
+				throw std::runtime_error("error : unable to allocate mysql handler.");
+				return false;
+			}
+			
+			/* Options */
+			if (m_url_ptr->get_param_value("compress") == "true")
+				client_flags |= CLIENT_COMPRESS;
 
-		int _execute_sql(const char * sql)
-		{
-#if defined SQLITEUNLOCK && SQLITE_VERSION_NUMBER >= 3006012
-			return sqlite_util::sqlite3_blocking_exec(m_db, sql, nullptr, nullptr, nullptr);
-#else
-			return sqlite_util::execute(m_timeout, sqlite3_exec, m_db, sql, nullptr, nullptr, nullptr);
+			if (m_url_ptr->get_param_value("use-ssl") == "true")
+				mysql_ssl_set(m_db, nullptr, nullptr, nullptr, nullptr, nullptr);
+
+			if (m_url_ptr->get_param_value("secure-auth") == "true")
+				mysql_options(m_db, MYSQL_SECURE_AUTH, (const void*)&mysql_util::yes);
+			else
+				mysql_options(m_db, MYSQL_SECURE_AUTH, (const void*)&mysql_util::no);
+
+			if (!timeout.empty())
+			{
+				int _timeout = std::atoi(timeout.c_str());
+				if (_timeout > 0)
+					connect_timeout = _timeout;
+			}
+			mysql_options(m_db, MYSQL_OPT_CONNECT_TIMEOUT, (const void *)&connect_timeout);
+
+			if (!charset.empty())
+				mysql_options(m_db, MYSQL_SET_CHARSET_NAME, (const void *)charset.c_str());
+
+#if MYSQL_VERSION_ID >= 50013
+			mysql_options(m_db, MYSQL_OPT_RECONNECT, (const void*)&mysql_util::yes);
 #endif
+			/* Connect */
+			if (mysql_real_connect(m_db, host.c_str(), user.c_str(), pass.c_str(), database.c_str(), (unsigned int)std::atoi(port.c_str()), unix_socket.c_str(), client_flags))
+				return true;
+
+			mysql_close(m_db);
+
+			return false;
 		}
 
-		sqlite3 * m_db = nullptr;
+	protected:
+
+		MYSQL * m_db = nullptr;
 	};
 
 }

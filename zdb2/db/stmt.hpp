@@ -34,6 +34,7 @@ namespace zdb2
 
 		}
 
+		virtual void close() = 0;
 
 		/** @name Parameters */
 		//@{

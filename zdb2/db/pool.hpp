@@ -28,7 +28,8 @@
 
 #include <zdb2/db/connection.hpp>
 #include <zdb2/db/sqlite/sqlite_connection.hpp>
-//#include <zdb2/db/mysql/mysql_connection.hpp>
+#include <zdb2/db/mysql/mysql_connection.hpp>
+#include <zdb2/db/sqlserver/sqlserver_connection.hpp>
 
 namespace zdb2 
 {
@@ -212,7 +213,7 @@ namespace zdb2
 		{
 			std::string _db_type = m_url_ptr->get_dbtype();
 			if (_db_type == "mysql")
-				return dynamic_cast<connection *>(new sqlite_connection(m_url_ptr, m_execute_timeout));
+				return dynamic_cast<connection *>(new mysql_connection(m_url_ptr, m_execute_timeout));
 			else if (_db_type == "oracle")
 				return dynamic_cast<connection *>(new sqlite_connection(m_url_ptr, m_execute_timeout));
 			else if (_db_type == "postgresql")
@@ -220,7 +221,7 @@ namespace zdb2
 			else if (_db_type == "sqlite")
 				return dynamic_cast<connection *>(new sqlite_connection(m_url_ptr, m_execute_timeout));
 			else if (_db_type == "sqlserver")
-				return dynamic_cast<connection *>(new sqlite_connection(m_url_ptr, m_execute_timeout));
+				return dynamic_cast<connection *>(new sqlserver_connection(m_url_ptr, m_execute_timeout));
 			else
 				throw std::runtime_error("error : unknown database type.");
 			return nullptr;
