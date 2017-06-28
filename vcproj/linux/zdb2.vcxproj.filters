@@ -1,0 +1,64 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="zdb2">
+      <UniqueIdentifier>{94e93c75-b7d3-4503-bb3d-9124e73b5873}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="zdb2\db">
+      <UniqueIdentifier>{76856968-496e-4c74-b377-822a71043c2b}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="zdb2\util">
+      <UniqueIdentifier>{58c569e3-fd64-4d73-8d7f-ff7b95322939}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="zdb2\net">
+      <UniqueIdentifier>{2d5b8970-2391-4462-a6c5-a03c19bf096a}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="zdb2\db\sqlite">
+      <UniqueIdentifier>{00d265bf-0bc2-469e-aee0-a33cc198cd43}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\main.cpp" />
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\zdb2\config.hpp">
+      <Filter>zdb2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\zdb.hpp">
+      <Filter>zdb2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\connection.hpp">
+      <Filter>zdb2\db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\pool.hpp">
+      <Filter>zdb2\db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\resultset.hpp">
+      <Filter>zdb2\db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\stmt.hpp">
+      <Filter>zdb2\db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\sqlite\sqlite_connection.hpp">
+      <Filter>zdb2\db\sqlite</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\sqlite\sqlite_resultset.hpp">
+      <Filter>zdb2\db\sqlite</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\sqlite\sqlite_stmt.hpp">
+      <Filter>zdb2\db\sqlite</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\sqlite\sqlite_util.hpp">
+      <Filter>zdb2\db\sqlite</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\net\url.hpp">
+      <Filter>zdb2\net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\util\rwlock.hpp">
+      <Filter>zdb2\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\util\spin_lock.hpp">
+      <Filter>zdb2\util</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>

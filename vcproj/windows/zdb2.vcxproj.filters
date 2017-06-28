@@ -1,0 +1,78 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Project ToolsVersion="4.0" xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <ItemGroup>
+    <Filter Include="源文件">
+      <UniqueIdentifier>{4FC737F1-C7A5-4376-A066-2A32D752A2FF}</UniqueIdentifier>
+      <Extensions>cpp;c;cc;cxx;def;odl;idl;hpj;bat;asm;asmx</Extensions>
+    </Filter>
+    <Filter Include="头文件">
+      <UniqueIdentifier>{93995380-89BD-4b04-88EB-625FBE52EBFB}</UniqueIdentifier>
+      <Extensions>h;hh;hpp;hxx;hm;inl;inc;xsd</Extensions>
+    </Filter>
+    <Filter Include="资源文件">
+      <UniqueIdentifier>{67DA6AB6-F800-4c08-8B7A-83BB121AAD01}</UniqueIdentifier>
+      <Extensions>rc;ico;cur;bmp;dlg;rc2;rct;bin;rgs;gif;jpg;jpeg;jpe;resx;tiff;tif;png;wav;mfcribbon-ms</Extensions>
+    </Filter>
+    <Filter Include="zdb2">
+      <UniqueIdentifier>{8e2b40f6-c309-4907-a07e-8b1b8d9195f9}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="zdb2\db">
+      <UniqueIdentifier>{5be1453f-3677-40ad-aa85-32a99210ffad}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="zdb2\util">
+      <UniqueIdentifier>{be767ae6-4c83-457f-a6e5-34ef666c4644}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="zdb2\net">
+      <UniqueIdentifier>{3661f482-c23e-4084-b4ed-f124bfa1e2f7}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="zdb2\db\sqlite">
+      <UniqueIdentifier>{ffe4f35f-f0f7-4792-9375-df19e7db2260}</UniqueIdentifier>
+    </Filter>
+  </ItemGroup>
+  <ItemGroup>
+    <ClCompile Include="..\main.cpp">
+      <Filter>源文件</Filter>
+    </ClCompile>
+  </ItemGroup>
+  <ItemGroup>
+    <ClInclude Include="..\..\zdb2\config.hpp">
+      <Filter>zdb2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\zdb.hpp">
+      <Filter>zdb2</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\net\url.hpp">
+      <Filter>zdb2\net</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\util\rwlock.hpp">
+      <Filter>zdb2\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\util\spin_lock.hpp">
+      <Filter>zdb2\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\connection.hpp">
+      <Filter>zdb2\db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\pool.hpp">
+      <Filter>zdb2\db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\resultset.hpp">
+      <Filter>zdb2\db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\stmt.hpp">
+      <Filter>zdb2\db</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\sqlite\sqlite_connection.hpp">
+      <Filter>zdb2\db\sqlite</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\sqlite\sqlite_resultset.hpp">
+      <Filter>zdb2\db\sqlite</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\sqlite\sqlite_stmt.hpp">
+      <Filter>zdb2\db\sqlite</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\sqlite\sqlite_util.hpp">
+      <Filter>zdb2\db\sqlite</Filter>
+    </ClInclude>
+  </ItemGroup>
+</Project>
