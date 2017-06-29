@@ -16,6 +16,18 @@
     <Filter Include="zdb2\db\sqlite">
       <UniqueIdentifier>{00d265bf-0bc2-469e-aee0-a33cc198cd43}</UniqueIdentifier>
     </Filter>
+    <Filter Include="zdb2\db\mysql">
+      <UniqueIdentifier>{38633c5a-8e92-4be7-ae42-dd6a925ad670}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="zdb2\db\oracle">
+      <UniqueIdentifier>{945880b8-1b65-4232-90ea-a93d0c70a9ad}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="zdb2\db\postgresql">
+      <UniqueIdentifier>{d845414d-fd4c-4e16-a42c-5db7aebf2328}</UniqueIdentifier>
+    </Filter>
+    <Filter Include="zdb2\db\sqlserver">
+      <UniqueIdentifier>{e7f53294-0b72-496a-b2d4-ac14c8eee5fa}</UniqueIdentifier>
+    </Filter>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\main.cpp" />
@@ -59,6 +71,54 @@
     </ClInclude>
     <ClInclude Include="..\..\zdb2\util\spin_lock.hpp">
       <Filter>zdb2\util</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\mysql\mysql_connection.hpp">
+      <Filter>zdb2\db\mysql</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\mysql\mysql_resultset.hpp">
+      <Filter>zdb2\db\mysql</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\mysql\mysql_stmt.hpp">
+      <Filter>zdb2\db\mysql</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\mysql\mysql_util.hpp">
+      <Filter>zdb2\db\mysql</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\sqlserver\sqlserver_connection.hpp">
+      <Filter>zdb2\db\sqlserver</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\sqlserver\sqlserver_resultset.hpp">
+      <Filter>zdb2\db\sqlserver</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\sqlserver\sqlserver_stmt.hpp">
+      <Filter>zdb2\db\sqlserver</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\sqlserver\sqlserver_util.hpp">
+      <Filter>zdb2\db\sqlserver</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\postgresql\postgresql_connection.hpp">
+      <Filter>zdb2\db\postgresql</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\postgresql\postgresql_resultset.hpp">
+      <Filter>zdb2\db\postgresql</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\postgresql\postgresql_stmt.hpp">
+      <Filter>zdb2\db\postgresql</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\postgresql\postgresql_util.hpp">
+      <Filter>zdb2\db\postgresql</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\oracle\oracle_connection.hpp">
+      <Filter>zdb2\db\oracle</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\oracle\oracle_resultset.hpp">
+      <Filter>zdb2\db\oracle</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\oracle\oracle_stmt.hpp">
+      <Filter>zdb2\db\oracle</Filter>
+    </ClInclude>
+    <ClInclude Include="..\..\zdb2\db\oracle\oracle_util.hpp">
+      <Filter>zdb2\db\oracle</Filter>
     </ClInclude>
   </ItemGroup>
 </Project>

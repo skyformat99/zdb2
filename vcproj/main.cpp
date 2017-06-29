@@ -16,16 +16,6 @@
 
 int main(int argc, char *argv[])
 {
-	try
-	{
-		throw std::runtime_error("url string is invalid,no oracle service name specified in url.");
-	}
-	catch (std::runtime_error & e)
-	{
-		std::printf("%s\n", e.what());
-	}
-
-	std::printf("------------begin\n");
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64) || defined(_WINDOWS_)
 	// Detected memory leaks on windows system,linux has't these function
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -53,8 +43,8 @@ int main(int argc, char *argv[])
 		return -1;
 	}
 
-	//std::shared_ptr<zdb2::url> url_ptr = std::make_shared<zdb2::url>("sqlite://engine.db3?synchronous=normal&heap_limit=8000&foreign_keys=on");
-	std::shared_ptr<zdb2::url> url_ptr = std::make_shared<zdb2::url>("mysql://localhost:3306/locapi?user=root&password=123456");
+	std::shared_ptr<zdb2::url> url_ptr = std::make_shared<zdb2::url>("sqlite://engine.db3?synchronous=normal&heap_limit=8000&foreign_keys=on");
+	//std::shared_ptr<zdb2::url> url_ptr = std::make_shared<zdb2::url>("mysql://localhost:3306/locapi?user=root&password=123456");
 
 	std::shared_ptr<zdb2::pool> pool_ptr = std::make_shared<zdb2::pool>(url_ptr);
 
