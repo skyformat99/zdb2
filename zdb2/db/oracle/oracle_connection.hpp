@@ -4,7 +4,8 @@
  * Author   : zhllxt
  * QQ       : 37792738
  * Email    : 37792738@qq.com
- * 
+ * referenced from : http://www.cnblogs.com/ychellboy/archive/2010/04/16/1713884.html
+ *                   http://kulong0105.blog.163.com/blog/static/174406191201162145944574/
  */
 
 

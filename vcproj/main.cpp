@@ -14,9 +14,18 @@
 #include <zdb2/zdb.hpp>
 
 
-
 int main(int argc, char *argv[])
 {
+	try
+	{
+		throw std::runtime_error("url string is invalid,no oracle service name specified in url.");
+	}
+	catch (std::runtime_error & e)
+	{
+		std::printf("%s\n", e.what());
+	}
+
+	std::printf("------------begin\n");
 #if defined(WIN32) || defined(_WIN32) || defined(_WIN64) || defined(_WINDOWS_)
 	// Detected memory leaks on windows system,linux has't these function
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
