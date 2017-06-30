@@ -76,9 +76,8 @@ namespace zdb2
 			// is as the shared_ptr<connection> custom deleter,we must insure that the class connection is not derived
 			// from std::enable_shared_from_this,otherwise when application exit,the pool shared_ptr reference count
 			// will not desired to 0,so the pool destructor will not be called,and will cause memory leaks.Why does 
-			// this happen? i guess because the connection object is created by "new" method.is we want to avoid this
-			// problem,may be we should created the connection object by shared_from_this method,but under this design
-			// of mine,we has to create the connection object by "new" method.
+			// this happen? i find that if we delete the connection pointer in the lumbda,this problem will not happen,
+			// but we can't delete the connection pointer in the lumbda under this design.
 			// [important] :
 			// why pass the this_ptr by shared_from_this to the lumdba function ? why not pass "this" pointer to the
 			// lumdba function directly?because the connection shared_ptr custom deleter has used "this" pool object,
